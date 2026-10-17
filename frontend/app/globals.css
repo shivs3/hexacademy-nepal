@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/*
+ * Hexacademy design tokens. Brand colours can be overridden at runtime from the
+ * CMS site settings (validated hex values injected on <html> in the root layout).
+ */
+:root {
+  --brand-navy: #102a43;
+  --brand-teal: #0a8ba7;
+  --brand-mint: #14b8a6;
+  --surface-page: #f5f8fc;
+  --surface-card: #ffffff;
+  --text-body: #1f2937;
+  --text-muted: #5b6878;
+  --border-subtle: #dfe5ec;
+  --danger: #b42318;
+  --warning: #b54708;
+  --success: #067647;
+}
+
+@theme inline {
+  --color-navy: var(--brand-navy);
+  --color-navy-900: color-mix(in oklab, var(--brand-navy) 85%, black);
+  --color-teal: var(--brand-teal);
+  --color-teal-700: color-mix(in oklab, var(--brand-teal) 80%, black);
+  --color-teal-50: color-mix(in oklab, var(--brand-teal) 8%, white);
+  --color-mint: var(--brand-mint);
+  --color-mint-50: color-mix(in oklab, var(--brand-mint) 10%, white);
+  --color-page: var(--surface-page);
+  --color-card: var(--surface-card);
+  --color-body: var(--text-body);
+  --color-muted: var(--text-muted);
+  --color-line: var(--border-subtle);
+  --color-danger: var(--danger);
+  --color-danger-50: color-mix(in oklab, var(--danger) 8%, white);
+  --color-warning: var(--warning);
+  --color-warning-50: color-mix(in oklab, var(--warning) 8%, white);
+  --color-success: var(--success);
+  --color-success-50: color-mix(in oklab, var(--success) 8%, white);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.875rem;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  color: var(--brand-navy);
+  letter-spacing: -0.015em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-teal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
