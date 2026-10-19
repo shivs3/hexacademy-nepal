@@ -46,10 +46,14 @@ frontend/
     preview/         staff-only previews of draft pages and posts
     (auth)/          login, register, forgot/reset password, verify email
     dashboard/       student area (server-gated by requireUser)
+    (public)/courses catalog and course pages
+    learn/           course player (server-rendered, access checked by the API per lesson)
     admin/           staff area (server-gated by requireStaff; each page re-checks its permission)
   components/ui/     accessible primitives (button, field, dialog, toast, …)
   components/shell/  dashboard/admin chrome
   components/cms/    public chrome, the section renderer and section components; admin/ holds the editors (section builder, rich text, media picker, SEO)
+  components/courses/  course cards, price tag, enroll panel; admin/ holds the curriculum builder, team editor and resource manager
+  components/learning/ player outline, lesson progress, enrolled-course cards
   lib/               API clients, auth helpers, validation schemas, formatting
   proxy.ts           optimistic redirect to /login when no session cookie exists
 ```
@@ -62,6 +66,12 @@ frontend/
 4. Next server components fetch the published payload per request and render through `SectionRenderer`; types the frontend doesn't know are skipped. Rich text is sanitised again with DOMPurify, and maths placeholders are rendered with KaTeX.
 5. Previews use the staff session: `/preview/pages/{id}` calls the staff preview endpoint with the visitor's cookies. There are no shareable preview tokens.
 
+## Catalog and learning (M3)
+
+- `apps/catalog` owns what is taught: categories, courses, teams, modules, lessons and resources. `policies.py` holds who may see, edit and publish a course; `services.py` the lifecycle rules (publish checks, reorder, team replacement); `resources.py` upload validation and file delivery; `cms_sections.py` registers the catalog-backed CMS sections (featured courses, course collection, course categories, instructors) so `apps/cms` never imports catalog models directly.
+- `apps/learning` owns who learns: enrollments and lesson progress. `services.py` is the single place that answers "may this user open this lesson" and derives course completion.
+- The public course page and the player are server components that call the API with the visitor's cookies. Progress buttons are small client components that post to the API and refresh.
+
 ## Roles
 
 | Role | Scope |
@@ -69,9 +79,9 @@ frontend/
 | Super admin | Everything. Granted only from the CLI (`grant_role`), audited. |
 | Content editor | CMS pages (incl. publishing), menus, site settings, blog, media, newsletter list (M2); public catalog (M3) |
 | Instructor | Own courses, lessons, question bank, exams, live sessions (M3–M6) |
-| Teaching assistant | Assigned courses: grading support, attendance (M3–M6) |
+| Teaching assistant | Assigned courses: read-only course view and learner progress (M3); grading support, attendance (M4–M6) |
 | Finance manager | Orders, payments, refunds, coupons. No answer keys or security settings (M5) |
-| Support staff | User directory, activate/deactivate accounts, enrollment help |
+| Support staff | User directory, activate/deactivate accounts, enrollments (grant, revoke, progress) |
 | Student | Own learning, exams, orders, certificates |
 
 The UI hides what a user cannot use, but **every check is enforced again in the API**, including object-level checks (for example, an instructor may only edit their own courses).

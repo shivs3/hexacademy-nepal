@@ -199,6 +199,7 @@ export function ImageInput({
   onChange,
   canUpload,
   invalid,
+  readOnly = false,
 }: {
   id?: string;
   value: number | null;
@@ -206,20 +207,22 @@ export function ImageInput({
   onChange: (value: number | null, ref: MediaRef | null) => void;
   canUpload?: boolean;
   invalid?: boolean;
+  /** Show the current image without the picker (for staff who cannot browse the media library). */
+  readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [fetched, setFetched] = useState<MediaRef | null>(null);
   const preview = detail && detail.id === value ? detail : fetched && fetched.id === value ? fetched : null;
 
   useEffect(() => {
-    if (value == null || (detail && detail.id === value)) return;
+    if (value == null || readOnly || (detail && detail.id === value)) return;
     const controller = new AbortController();
     api
       .get<MediaAsset>(`/admin/cms/media/${value}/`, { signal: controller.signal })
       .then((asset) => setFetched(toMediaRef(asset)))
       .catch(() => undefined);
     return () => controller.abort();
-  }, [value, detail]);
+  }, [value, detail, readOnly]);
 
   return (
     <div id={id} className={cn("flex items-center gap-3 rounded-lg border border-line bg-white p-2", invalid && "border-danger")}>
@@ -235,28 +238,34 @@ export function ImageInput({
         <span className="truncate text-xs text-muted">
           {value == null ? "No image selected" : preview ? preview.alt || "No alt text set" : `Image #${value}`}
         </span>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-            {value == null ? "Choose image" : "Change"}
-          </Button>
-          {value != null && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null, null)} aria-label="Remove image">
-              <X className="h-4 w-4" aria-hidden="true" />
-              Remove
+        {readOnly ? (
+          <span className="text-xs text-muted">Ask a content editor to change this image.</span>
+        ) : (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+              {value == null ? "Choose image" : "Change"}
             </Button>
-          )}
-        </div>
+            {value != null && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null, null)} aria-label="Remove image">
+                <X className="h-4 w-4" aria-hidden="true" />
+                Remove
+              </Button>
+            )}
+          </div>
+        )}
       </div>
-      <MediaPickerDialog
-        open={open}
-        onOpenChange={setOpen}
-        canUpload={canUpload}
-        onSelect={(asset) => {
-          const ref = toMediaRef(asset);
-          setFetched(ref);
-          onChange(asset.id, ref);
-        }}
-      />
+      {!readOnly && (
+        <MediaPickerDialog
+          open={open}
+          onOpenChange={setOpen}
+          canUpload={canUpload}
+          onSelect={(asset) => {
+            const ref = toMediaRef(asset);
+            setFetched(ref);
+            onChange(asset.id, ref);
+          }}
+        />
+      )}
     </div>
   );
 }

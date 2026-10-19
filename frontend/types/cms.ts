@@ -1,5 +1,7 @@
 /** Public CMS payloads (mirrors apps/cms/serializers.py). */
 
+import type { CourseCard, Instructor } from "./catalog";
+
 export type MediaRef = {
   id: number;
   url: string;
@@ -95,6 +97,23 @@ export type SectionDataMap = {
     show_address: boolean;
     extra: string;
   };
+  // Catalog-backed sections: the backend resolves stored ids into published data.
+  featured_courses: {
+    heading: string;
+    intro: string;
+    source: "featured" | "latest" | "category";
+    category: { name: string; slug: string } | null;
+    limit: number;
+    courses: CourseCard[];
+  } & Cta<"cta">;
+  course_collection: { heading: string; intro: string; courses: CourseCard[] } & Cta<"cta">;
+  course_categories: {
+    heading: string;
+    intro: string;
+    show_counts: boolean;
+    categories: { name: string; slug: string; description: string; course_count: number }[];
+  };
+  instructors: { heading: string; intro: string; limit: number; instructors: Instructor[] };
 };
 
 export type SectionType = keyof SectionDataMap;

@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   CreditCard,
   FileText,
+  GraduationCap,
   Gauge,
   Image as ImageIcon,
   LayoutDashboard,
@@ -15,6 +16,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Tags,
   User,
   Users,
 } from "lucide-react";
@@ -26,6 +28,8 @@ import {
 const icons = {
   dashboard: LayoutDashboard,
   courses: BookOpen,
+  categories: Tags,
+  enrollments: GraduationCap,
   live: CalendarClock,
   exams: ClipboardCheck,
   certificates: Award,

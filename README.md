@@ -53,9 +53,12 @@ npm run lint && npm run typecheck && npm test && npm run build
 npm run e2e                      # needs both dev servers running; uses the dev database
 ```
 
-The CMS end-to-end test is skipped unless `E2E_EDITOR_EMAIL` and `E2E_EDITOR_PASSWORD` name a staff account with the
-`content_editor` role (`python manage.py grant_role <email> --role content_editor`). Demo CMS content:
-`python manage.py seed_cms`.
+The CMS and learning end-to-end tests are skipped unless `E2E_EDITOR_EMAIL` and `E2E_EDITOR_PASSWORD` name a staff
+account with the `content_editor` role (`python manage.py grant_role <email> --role content_editor`). The learning test
+also needs `E2E_INSTRUCTOR_EMAIL`, an account with the `instructor` role.
+
+Demo content, clearly labelled as such: `python manage.py seed_cms` (pages, menus, settings) and
+`python manage.py seed_catalog --instructor <email>` (two demo courses; without `--instructor` they stay drafts).
 
 ## Production
 

@@ -6,7 +6,7 @@ PostgreSQL 17. The schema is managed only through Django migrations. Every model
 
 - Primary keys: `BigAutoField`. Public-facing identifiers that must not be guessable (certificate codes, order references) get a separate random column.
 - Timestamps: `created_at` / `updated_at` via `common.models.TimeStampedModel`, stored in UTC and displayed in Asia/Kathmandu.
-- Money: `BigIntegerField` in paisa plus a `currency` column (ADR-005).
+- Money: never floats. Catalog list prices are `DecimalField(10, 2)` in NPR (ADR-015). Order and payment amounts (M5) follow ADR-005.
 - Deletion: `PROTECT` on financial and assessment history, `SET_NULL` on audit actors, and `CASCADE` only for owned child rows.
 - Integrity rules (uniqueness, valid state combinations) are enforced with database constraints where practical, not only in Python.
 
@@ -62,6 +62,35 @@ SEO columns, shared by pages and posts through the `SeoFields` abstract model: `
 Section JSON refers to media by id. When an asset is deleted, the foreign-key columns are set to NULL and an id left inside section JSON simply resolves to no image when rendered.
 
 Custom permissions: `cms.manage_media`, `manage_site_settings`, `manage_pages`, `publish_pages`, `manage_menus`, `manage_blog`, `publish_blog` and `view_newsletter_subscribers`.
+
+## Catalog and learning tables (M3)
+
+```
+Category ──< Category                    parent (one level in the UI), PROTECT
+Course ──► Category                      SET_NULL
+Course ──► MediaAsset                    thumbnail, og_image   SET_NULL
+Course ──< CourseInstructor >── User     (CASCADE; role instructor / teaching_assistant)
+Course ──< CourseModule ──< Lesson ──< LessonResource   (CASCADE)
+Lesson ──► Course                        denormalised for access checks, kept equal to module.course
+Enrollment ──► User (CASCADE), Course (PROTECT)
+Enrollment ──< LessonProgress ──► Lesson (CASCADE)
+Enrollment ──► Lesson                    last_lesson   SET_NULL
+```
+
+| Table | Key columns and rules |
+| --- | --- |
+| `catalog_category` | `name` (80), `slug` unique (90), `parent`, `description` (300), `position`. Unique `(parent, name)` with `NULLS NOT DISTINCT`. `CHECK`: not its own parent |
+| `catalog_course` | `slug` unique (160), `title` (160), `subtitle` (220), `description` (sanitised HTML), `level`, `language`, `duration_text`, `learning_outcomes` / `prerequisites` (validated JSON string lists), `sequential`, `price` / `sale_price` (decimal 10,2), `sale_ends_at`, `is_featured`, `status` draft/published/archived (indexed), `published_at`, SEO columns. Indexes `(status, -published_at)` and `(category, status)`. `CHECK`s: price ≥ 0; sale price below price; published ⇒ `published_at` set |
+| `catalog_courseinstructor` | `(course, user)` unique, `role`, `is_public`, `position` |
+| `catalog_coursemodule` | `title` (160), `description` (500), `position`. Index `(course, position)` |
+| `catalog_lesson` | `title` (160), `summary` (300), `body` (sanitised HTML with maths nodes), `video_url` (YouTube/Vimeo only), `duration_minutes` (0–1440), `is_preview`, `is_published`, `position`. Indexes `(module, position)` and `(course, is_published)` |
+| `catalog_lessonresource` | `kind` file/link, `file` (private storage key) **or** `url` (`CHECK`: exactly one), `original_name`, `mime_type` and `size_bytes` (detected on the server), `position`. At most 30 per lesson (service rule) |
+| `learning_enrollment` | `(user, course)` unique, so a learner can never be enrolled twice. `status` active/revoked (indexed), `source` free/purchase/admin, `granted_by`, `enrolled_at`, `completed_at`, `revoked_at` (`CHECK`: revoked ⇔ date set), `last_lesson`, `last_accessed_at` |
+| `learning_lessonprogress` | `(enrollment, lesson)` unique, `first_viewed_at`, `completed_at` |
+
+Revoking keeps the enrollment row and its progress, so restoring access loses nothing. Courses with enrollments cannot be deleted (`PROTECT`) and cannot return to draft, only be archived.
+
+Custom permissions: `catalog.manage_catalog`, `publish_courses`, `author_assigned_courses`; `learning.manage_enrollments`, `view_learner_progress`.
 
 ## Backups
 

@@ -25,7 +25,7 @@ Short records of choices that are expensive to reverse. Newest last.
 
 ## ADR-005: Money in integer minor units
 
-**Decision:** All amounts are stored as integer paisa (`BigIntegerField`), with currency NPR. Floats are never used for money. Display formatting happens only at the edge (`formatMoney`).
+**Decision:** All transactional amounts (orders, payments, refunds) are stored as integer paisa (`BigIntegerField`), with currency NPR. Catalog list prices are fixed-precision decimals (ADR-015). Floats are never used for money. Display formatting happens only at the edge (`formatMoney`).
 
 ## ADR-006: Next.js `cacheComponents` disabled; CMS routes render dynamically
 
@@ -74,3 +74,32 @@ Short records of choices that are expensive to reverse. Newest last.
 
 **Decision:** The Tiptap editor stores formulas as `<span|div data-type="inline-math|block-math" data-latex="…">` nodes, which survive the backend allowlist. They are rendered with KaTeX (`trust: false`, bounded `maxExpand`/`maxSize`) on the server when the page is rendered. The stored HTML never contains KaTeX output.
 **Consequences:** Upgrading KaTeX re-renders everything consistently. The same nodes will be reused for lesson content and exam questions (M3/M4).
+
+## ADR-015: Catalog prices are fixed-precision decimals
+
+**Context:** ADR-005 put all money in integer paisa. Course prices are entered and read by people ("2500.00"), are compared in SQL for the price filter and ordering, and never take part in arithmetic beyond a comparison.
+**Decision:** `Course.price` and `sale_price` are `DecimalField(10, 2)` in NPR, serialised as decimal strings. The frontend never parses them as floats: `decimalToMinor` converts them digit by digit before formatting. ADR-005 still applies to orders, payments, refunds and coupons (M5), which convert the decimal list price to paisa once, when the order item is snapshotted.
+**Consequences:** Two representations exist; the conversion point is the order snapshot and is covered by tests there. Both are exact, and neither ever passes through floating point.
+
+## ADR-016: Lesson access is decided in one service
+
+**Decision:** `apps/learning/services.lesson_access` is the only function that decides whether a user may open a lesson. It is used by the lesson, progress and resource-download endpoints; the player outline marks locked lessons with `locked_lesson_ids` from the same module. It covers free previews, enrollment, sequential locking and staff access.
+**Consequences:** Any new lesson-scoped feature (assignments, exams attached to lessons) must call it instead of re-deriving the rules.
+
+## ADR-017: Staff course edits are partial and field-scoped
+
+**Context:** Instructors may edit their own course content, but price, featured status and a live course's address belong to catalog managers.
+**Decision:** The course PATCH refuses any manager-only field from a non-manager, even if its value is unchanged, rather than silently ignoring it. The editor therefore sends only the fields that changed. Teams are replaced as a whole (`PUT …/team/`), and curriculum reorders must list every module and lesson, so a stale editor gets a 409 and reloads instead of overwriting someone else's change.
+**Consequences:** Clients must diff before saving. Rejections are explicit, so a permission gap can't hide as a no-op save.
+
+## ADR-018: Enrollment admin uses its own scoped course list
+
+**Context:** Support staff manage enrollments but have no catalog permissions, so they can't call `/admin/catalog/courses/`.
+**Decision:** `GET /admin/learning/courses/` returns just `{id, title, slug, status}` for non-draft courses the caller may see enrollments for (all for enrollment managers, only taught courses for instructors and TAs).
+**Consequences:** Granting enrollment access doesn't require granting catalog access. The endpoint is capped at 500 rows and should become searchable if the catalog grows past that.
+
+## ADR-019: Revoking access keeps the enrollment
+
+**Decision:** Revoking sets `status=revoked` and `revoked_at` but keeps the row and its lesson progress. A revoked learner can't re-enroll themselves in a free course (403 `revoked`); only staff can reinstate them. Courses with enrollments are archived, never deleted or returned to draft.
+**Consequences:** History survives for support, refunds (M5) and certificates (M6). Removing a learner's data entirely is a separate deletion process, to be defined with the retention policy in M7.
+

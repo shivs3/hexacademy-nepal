@@ -8,6 +8,7 @@ import { Checkbox, Input, Label, Select, Textarea } from "@/components/ui/input"
 import type { FieldDescriptor } from "@/types/cms-admin";
 
 import { ImageInput } from "./media-picker";
+import { ReferencePicker } from "./reference-picker";
 import { RichTextEditor } from "./rich-text-editor";
 
 export type FieldErrors = Record<string, string>;
@@ -15,6 +16,8 @@ export type FieldErrors = Record<string, string>;
 /** Initial value for a field, matching what the backend stores for "empty". */
 export function emptyValue(field: FieldDescriptor): unknown {
   switch (field.kind) {
+    case "refs":
+      return [];
     case "list":
       return Array.from({ length: field.min_items ?? 0 }, () => emptyData(field.fields ?? []));
     case "boolean":
@@ -23,6 +26,7 @@ export function emptyValue(field: FieldDescriptor): unknown {
       return (field.default as string | undefined) ?? field.choices?.[0]?.value ?? "";
     case "image":
     case "integer":
+    case "ref":
       return null;
     default:
       return "";
@@ -60,7 +64,7 @@ export function FieldsForm({
       {fields.map((f) => (
         <div
           key={f.name}
-          className={f.kind === "richtext" || f.kind === "list" || f.kind === "textarea" || f.kind === "image" ? "sm:col-span-2" : undefined}
+          className={f.kind === "richtext" || f.kind === "list" || f.kind === "textarea" || f.kind === "image" || f.kind === "refs" ? "sm:col-span-2" : undefined}
         >
           <FieldControl
             field={f}
@@ -167,6 +171,26 @@ function FieldControl({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={id}>{field.label}</Label>
           <ImageInput id={id} value={typeof value === "number" ? value : null} onChange={(v) => onChange(v)} invalid={Boolean(error)} />
+          {error ? <p className="text-xs text-danger">{error}</p> : field.help ? <p className="text-xs text-muted">{field.help}</p> : null}
+        </div>
+      );
+    case "ref":
+    case "refs":
+      return (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={id}>
+            {field.label}
+            {field.required && <span className="ml-0.5 text-danger" aria-hidden="true">*</span>}
+          </Label>
+          <ReferencePicker
+            id={id}
+            reference={field.ref ?? ""}
+            multiple={field.kind === "refs"}
+            max={field.max_items}
+            value={field.kind === "refs" ? (Array.isArray(value) ? (value as number[]) : []) : typeof value === "number" ? [value] : []}
+            onChange={(ids) => onChange(field.kind === "refs" ? ids : (ids[0] ?? null))}
+            invalid={Boolean(error)}
+          />
           {error ? <p className="text-xs text-danger">{error}</p> : field.help ? <p className="text-xs text-muted">{field.help}</p> : null}
         </div>
       );

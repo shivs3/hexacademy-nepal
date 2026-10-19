@@ -13,10 +13,12 @@ import { cn, initials } from "@/lib/utils";
 
 import { NavIcon, type NavIconName } from "./nav-icons";
 
-export type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
+/** `exact` limits the highlight to the href itself; `match` adds the path prefixes that also count as this item. */
+export type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean; match?: string[] };
 export type NavSection = { title?: string; items: NavItem[] };
 
-export function isActive(pathname: string, item: Pick<NavItem, "href" | "exact">): boolean {
+export function isActive(pathname: string, item: Pick<NavItem, "href" | "exact" | "match">): boolean {
+  if (item.match?.some((prefix) => pathname.startsWith(`${prefix}/`))) return true;
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }

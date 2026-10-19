@@ -25,7 +25,8 @@
 
 ## Data protection
 
-- (M3) Private files (course videos, resources, certificates) live in a private bucket and are delivered via signed URLs (default 5 minutes) after a permission check.
+- **Lesson files (M3):** resources are stored with the `private` storage backend (a separate bucket with object storage, `private_media/` locally, never web-served). Every download goes through the API, which checks lesson access first, then either streams the file (`Cache-Control: private, no-store`) or redirects to a signed URL valid for `PRIVATE_URL_TTL_SECONDS` (default 300). Files are always served as attachments with the type detected at upload: PDF, images, Office/OpenDocument and zip (checked by signature) and UTF-8 text/code files (served as `text/plain`). Uploads and deletes are audited.
+- **Course access (M3):** lesson content, resources and progress are checked in `apps/learning/services.lesson_access` on every request; the course player UI is never trusted. Paid courses can't be joined through the free enroll endpoint (402) — enrollment for them comes only from a staff grant (audited) until verified payments land in M5. Course completion is derived from stored progress, never from a client flag. Instructors can only see and edit courses whose team they are on; price, featured status and a live course's address are manager-only.
 - Audit metadata automatically redacts keys such as `password`, `token`, `secret`, `correct_option_ids`, etc.
 - Gunicorn and Nginx access logs record paths without query strings, since links carry one-time tokens.
 - **CMS content (M2):**

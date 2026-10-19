@@ -10,7 +10,7 @@ from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -206,6 +206,41 @@ class SectionTypesView(APIView):
     @extend_schema(responses=inline_serializer("SectionTypeInfo", {"type": serializers.CharField()}, many=True))
     def get(self, request):
         return Response(sections.describe_section_types())
+
+
+class SectionReferenceOptionsView(APIView):
+    """Choices for `ref`/`refs` section fields (e.g. courses), searched by name."""
+
+    permission_classes = [HasPerm(MANAGE_PAGES)]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("search", str),
+            OpenApiParameter("ids", str, description="Comma-separated ids to label (the current selection)."),
+        ],
+        responses=inline_serializer(
+            "SectionReferenceOption",
+            {
+                "id": serializers.IntegerField(),
+                "label": serializers.CharField(),
+                "description": serializers.CharField(),
+            },
+            many=True,
+        ),
+    )
+    def get(self, request, key):
+        reference = sections.REFERENCES.get(key)
+        if reference is None:
+            raise Http404
+        search = request.query_params.get("search", "").strip()[:100]
+        raw_ids = request.query_params.get("ids")
+        ids = None
+        if raw_ids is not None:
+            parts = [p for p in raw_ids.split(",") if p]
+            if len(parts) > 50 or not all(p.isdigit() and len(p) < 10 for p in parts):
+                raise ValidationError({"ids": "Give up to 50 comma-separated ids."})
+            ids = {int(p) for p in parts}
+        return Response(list(reference.options(search, ids)))
 
 
 # --- Media ------------------------------------------------------------------------------

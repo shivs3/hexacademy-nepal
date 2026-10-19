@@ -24,6 +24,11 @@ urlpatterns = [
     # Staff
     path("admin/cms/overview/", admin_views.CmsOverviewView.as_view(), name="admin-cms-overview"),
     path("admin/cms/section-types/", admin_views.SectionTypesView.as_view(), name="admin-cms-section-types"),
+    path(
+        "admin/cms/references/<slug:key>/",
+        admin_views.SectionReferenceOptionsView.as_view(),
+        name="admin-cms-section-references",
+    ),
     path("admin/cms/site-settings/", admin_views.AdminSiteSettingsView.as_view(), name="admin-cms-site-settings"),
     path("admin/cms/menus/", admin_views.AdminMenuListView.as_view(), name="admin-cms-menus"),
     path("admin/cms/menus/<str:location>/", admin_views.AdminMenuDetailView.as_view(), name="admin-cms-menu"),

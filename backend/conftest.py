@@ -63,3 +63,35 @@ def client_for(make_user):
         return client
 
     return _client
+
+
+@pytest.fixture
+def make_course(db):
+    """A course with one module and `lessons` published lessons (ORM only, no API)."""
+    from django.utils import timezone
+
+    from apps.catalog.models import Course, CourseInstructor, CourseModule, Lesson
+
+    def _make(*, slug=None, status="published", price=0, lessons=2, instructor=None, ta=None, **extra):
+        n = next(_seq)
+        course = Course.objects.create(
+            title=extra.pop("title", f"Course {n}"),
+            slug=slug or f"course-{n}",
+            subtitle=extra.pop("subtitle", "Demo course"),
+            status=status,
+            published_at=timezone.now() if status != "draft" else None,
+            price=price,
+            **extra,
+        )
+        module = CourseModule.objects.create(course=course, title="Module 1", position=0)
+        for i in range(lessons):
+            Lesson.objects.create(
+                course=course, module=module, title=f"Lesson {i + 1}", body="<p>Body</p>", position=i, is_published=True
+            )
+        if instructor:
+            CourseInstructor.objects.create(course=course, user=instructor, role="instructor")
+        if ta:
+            CourseInstructor.objects.create(course=course, user=ta, role="teaching_assistant")
+        return course
+
+    return _make

@@ -1,5 +1,6 @@
 import type { Section, SiteSettings } from "@/types/cms";
 
+import { CourseCategoriesSection, CourseCollectionSection, FeaturedCoursesSection, InstructorsSection } from "./sections/catalog";
 import {
   CtaSection,
   FeaturesSection,
@@ -41,6 +42,14 @@ function renderSection(section: Section, index: number, settings: SiteSettings) 
       return <NewsletterSection data={section.data} level={level} />;
     case "contact":
       return <ContactSection data={section.data} settings={settings} level={level} />;
+    case "featured_courses":
+      return <FeaturedCoursesSection data={section.data} level={level} />;
+    case "course_collection":
+      return <CourseCollectionSection data={section.data} level={level} />;
+    case "course_categories":
+      return <CourseCategoriesSection data={section.data} level={level} />;
+    case "instructors":
+      return <InstructorsSection data={section.data} level={level} />;
     default:
       return null;
   }

@@ -36,6 +36,8 @@ LOCAL_APPS = [
     "apps.accounts",
     "apps.audit",
     "apps.cms",
+    "apps.catalog",
+    "apps.learning",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -216,6 +218,13 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "ENUM_NAME_OVERRIDES": {
+        "ContentStatusEnum": "apps.cms.models.Page.Status",
+        "EnrollmentStatusEnum": "apps.learning.models.Enrollment.Status",
+        "MediaKindEnum": "apps.cms.models.MediaAsset.Kind",
+        "ResourceKindEnum": "apps.catalog.models.LessonResource.Kind",
+        "LanguageEnum": LANGUAGES,
+    },
 }
 
 # --- Email

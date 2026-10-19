@@ -9,14 +9,19 @@ has not been sanitised.
 Stored shape of a page's sections:
     [{"id": "a1b2…", "type": "hero", "hidden": false, "data": {...}}, ...]
 
-Catalog-backed sections (featured courses, categories, instructors, course
-collections) are added with the catalog in M3.
+Other apps contribute section types with ``register_section_type`` (the
+catalog adds featured courses, categories, instructors and collections). Fields
+of kind ``ref``/``refs`` point at records owned by another app; that app
+registers a ``Reference`` that validates ids and lists options for the editor.
+A section type's ``resolve`` hook turns stored ids into public data at read
+time, so unpublished records never appear on a page.
 """
 
 from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -31,7 +36,7 @@ _SECTION_ID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 @dataclass(frozen=True)
 class Field:
     name: str
-    kind: str  # text | textarea | richtext | link | image | video | select | boolean | integer | list
+    kind: str  # text | textarea | richtext | link | image | video | select | boolean | integer | list | ref | refs
     label: str
     required: bool = False
     max_length: int | None = None
@@ -43,6 +48,7 @@ class Field:
     max_items: int | None = None
     min_value: int | None = None
     max_value: int | None = None
+    ref: str = ""  # reference type for kind="ref"/"refs"
 
     def describe(self) -> dict:
         out: dict[str, Any] = {"name": self.name, "kind": self.kind, "label": self.label, "required": self.required}
@@ -56,6 +62,8 @@ class Field:
         if self.kind == "list":
             out["min_items"] = self.min_items
             out["fields"] = [f.describe() for f in self.fields]
+        if self.kind in {"ref", "refs"}:
+            out["ref"] = self.ref
         return out
 
 
@@ -65,6 +73,8 @@ class SectionType:
     label: str
     description: str
     fields: tuple[Field, ...] = field(default_factory=tuple)
+    # Adds computed public data (e.g. course cards) to the resolved section data.
+    resolve: Callable[[dict], dict] | None = None
 
     def describe(self) -> dict:
         return {
@@ -86,15 +96,15 @@ ICONS = tuple(
 THEMES = (("light", "Light"), ("dark", "Dark (navy)"), ("accent", "Accent (teal)"))
 
 
-def _cta(prefix: str, label: str) -> tuple[Field, Field]:
+def cta_fields(prefix: str, label: str) -> tuple[Field, Field]:
     return (
         Field(f"{prefix}_label", "text", f"{label} label", max_length=40),
         Field(f"{prefix}_url", "link", f"{label} link", help="A site path such as /courses, or https://…"),
     )
 
 
-_HEADING = Field("heading", "text", "Heading", max_length=120)
-_INTRO = Field("intro", "textarea", "Introduction", max_length=400)
+HEADING = Field("heading", "text", "Heading", max_length=120)
+INTRO = Field("intro", "textarea", "Introduction", max_length=400)
 
 SECTION_TYPES: dict[str, SectionType] = {
     s.key: s
@@ -107,8 +117,8 @@ SECTION_TYPES: dict[str, SectionType] = {
                 Field("eyebrow", "text", "Eyebrow text", max_length=60),
                 Field("heading", "text", "Heading", required=True, max_length=120),
                 Field("subheading", "textarea", "Subheading", max_length=300),
-                *_cta("primary_cta", "Primary button"),
-                *_cta("secondary_cta", "Secondary button"),
+                *cta_fields("primary_cta", "Primary button"),
+                *cta_fields("secondary_cta", "Secondary button"),
                 Field("image", "image", "Image"),
                 Field("theme", "select", "Background", choices=THEMES[:2], default="light"),
             ),
@@ -118,7 +128,7 @@ SECTION_TYPES: dict[str, SectionType] = {
             "Rich text",
             "Formatted text with headings, lists, links and maths.",
             (
-                _HEADING,
+                HEADING,
                 Field("body", "richtext", "Content", required=True, max_length=50_000),
                 Field("width", "select", "Width", choices=(("narrow", "Narrow"), ("wide", "Wide")), default="narrow"),
             ),
@@ -128,8 +138,8 @@ SECTION_TYPES: dict[str, SectionType] = {
             "Benefits / features",
             "A grid of short benefit statements with icons.",
             (
-                _HEADING,
-                _INTRO,
+                HEADING,
+                INTRO,
                 Field("columns", "select", "Columns", choices=(("2", "2"), ("3", "3"), ("4", "4")), default="3"),
                 Field(
                     "items",
@@ -150,8 +160,8 @@ SECTION_TYPES: dict[str, SectionType] = {
             "Testimonials",
             "Quotes from learners.",
             (
-                _HEADING,
-                _INTRO,
+                HEADING,
+                INTRO,
                 Field(
                     "items",
                     "list",
@@ -173,8 +183,8 @@ SECTION_TYPES: dict[str, SectionType] = {
             "FAQ",
             "Expandable questions and answers (also published as FAQ structured data).",
             (
-                _HEADING,
-                _INTRO,
+                HEADING,
+                INTRO,
                 Field(
                     "items",
                     "list",
@@ -193,8 +203,8 @@ SECTION_TYPES: dict[str, SectionType] = {
             "Statistics",
             "A row of key figures.",
             (
-                _HEADING,
-                _INTRO,
+                HEADING,
+                INTRO,
                 Field(
                     "items",
                     "list",
@@ -225,7 +235,7 @@ SECTION_TYPES: dict[str, SectionType] = {
                     choices=(("left", "Left"), ("right", "Right")),
                     default="right",
                 ),
-                *_cta("cta", "Button"),
+                *cta_fields("cta", "Button"),
             ),
         ),
         SectionType(
@@ -233,8 +243,8 @@ SECTION_TYPES: dict[str, SectionType] = {
             "Video",
             "An embedded YouTube or Vimeo video.",
             (
-                _HEADING,
-                _INTRO,
+                HEADING,
+                INTRO,
                 Field("video_url", "video", "Video link", required=True, help="YouTube or Vimeo address."),
                 Field("caption", "text", "Caption", max_length=200),
             ),
@@ -248,7 +258,7 @@ SECTION_TYPES: dict[str, SectionType] = {
                 Field("text", "textarea", "Text", max_length=300),
                 Field("button_label", "text", "Button label", required=True, max_length=40),
                 Field("button_url", "link", "Button link", required=True),
-                *_cta("secondary", "Secondary button"),
+                *cta_fields("secondary", "Secondary button"),
                 Field("theme", "select", "Style", choices=THEMES, default="dark"),
             ),
         ),
@@ -277,8 +287,8 @@ SECTION_TYPES: dict[str, SectionType] = {
             "Contact information",
             "Contact details from the site settings, with optional extra text.",
             (
-                _HEADING,
-                _INTRO,
+                HEADING,
+                INTRO,
                 Field("show_email", "boolean", "Show email", default=True),
                 Field("show_phone", "boolean", "Show phone", default=True),
                 Field("show_address", "boolean", "Show address", default=True),
@@ -289,6 +299,29 @@ SECTION_TYPES: dict[str, SectionType] = {
 }
 
 
+@dataclass(frozen=True)
+class Reference:
+    """A kind of record that sections may point at, owned by another app."""
+
+    key: str
+    existing_ids: Callable[[set[int]], set[int]]  # which of these ids exist
+    # Editor choices [{"id", "label", "description"}], by search text or (when ids is given) for those ids.
+    options: Callable[[str, set[int] | None], Iterable[dict]]
+
+
+REFERENCES: dict[str, Reference] = {}
+
+
+def register_reference(reference: Reference):
+    REFERENCES[reference.key] = reference
+
+
+def register_section_type(section_type: SectionType):
+    for f in section_type.fields:
+        assert f.kind not in {"ref", "refs"} or f.ref, f"{section_type.key}.{f.name} needs a ref type"
+    SECTION_TYPES[section_type.key] = section_type
+
+
 def describe_section_types() -> list[dict]:
     return [s.describe() for s in SECTION_TYPES.values()]
 
@@ -297,6 +330,7 @@ class _Collector:
     def __init__(self):
         self.errors: dict[str, list[str]] = {}
         self.image_refs: list[tuple[str, int]] = []
+        self.refs: list[tuple[str, str, int]] = []  # (path, reference type, id)
 
     def add(self, path: str, message: str):
         self.errors.setdefault(path, []).append(message)
@@ -307,11 +341,11 @@ def _clean_value(f: Field, raw: Any, path: str, out: _Collector) -> Any:  # noqa
     if empty:
         if f.required:
             out.add(path, "This field is required.")
-        if f.kind == "list":
+        if f.kind in {"list", "refs"}:
             return []
         if f.kind == "boolean":
             return bool(f.default)
-        return f.default if f.kind == "select" else None if f.kind in {"image", "integer"} else ""
+        return f.default if f.kind == "select" else None if f.kind in {"image", "integer", "ref"} else ""
 
     if f.kind in {"text", "textarea", "link", "video"} and not isinstance(raw, str):
         out.add(path, "Enter text.")
@@ -381,6 +415,26 @@ def _clean_value(f: Field, raw: Any, path: str, out: _Collector) -> Any:  # noqa
             out.add(path, f"Must be at most {f.max_value}.")
         return raw
 
+    if f.kind == "ref":
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            out.add(path, "Choose one of the listed options.")
+            return None
+        out.refs.append((path, f.ref, raw))
+        return raw
+
+    if f.kind == "refs":
+        if not isinstance(raw, list) or any(isinstance(v, bool) or not isinstance(v, int) for v in raw):
+            out.add(path, "Choose from the listed options.")
+            return []
+        ids = list(dict.fromkeys(raw))  # de-duplicate, keep order
+        if len(ids) < f.min_items:
+            out.add(path, f"Choose at least {f.min_items}.")
+        if f.max_items is not None and len(ids) > f.max_items:
+            out.add(path, f"Choose at most {f.max_items}.")
+            ids = ids[: f.max_items]
+        out.refs.extend((f"{path}.{i}", f.ref, v) for i, v in enumerate(ids))
+        return ids
+
     if f.kind == "list":
         if not isinstance(raw, list):
             out.add(path, "Must be a list.")
@@ -449,6 +503,16 @@ def clean_sections(raw: Any) -> list[dict]:
             if ref not in found:
                 out.add(path, "This image no longer exists in the media library.")
 
+    by_type: dict[str, set[int]] = {}
+    for _, ref_type, ref_id in out.refs:
+        by_type.setdefault(ref_type, set()).add(ref_id)
+    for ref_type, ids in by_type.items():
+        reference = REFERENCES.get(ref_type)
+        found = reference.existing_ids(ids) if reference else set()
+        for path, t, ref_id in out.refs:
+            if t == ref_type and ref_id not in found:
+                out.add(path, "This item no longer exists.")
+
     if out.errors:
         raise ValidationError(out.errors)
     return cleaned
@@ -502,7 +566,8 @@ def public_sections(sections: list[dict], media: dict[int, dict]) -> list[dict]:
         stype = SECTION_TYPES.get(s.get("type"))
         if stype is None or s.get("hidden"):
             continue
-        result.append(
-            {"id": s.get("id"), "type": stype.key, "data": _resolve(stype.fields, s.get("data") or {}, media)}
-        )
+        data = _resolve(stype.fields, s.get("data") or {}, media)
+        if stype.resolve:
+            data = stype.resolve(data)
+        result.append({"id": s.get("id"), "type": stype.key, "data": data})
     return result

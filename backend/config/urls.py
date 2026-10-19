@@ -8,6 +8,8 @@ from common.health import health, readiness
 api_v1 = [
     path("", include("apps.accounts.urls")),
     path("", include("apps.cms.urls")),
+    path("", include("apps.catalog.urls")),
+    path("", include("apps.learning.urls")),
 ]
 
 urlpatterns = [

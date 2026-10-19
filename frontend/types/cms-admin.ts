@@ -76,7 +76,9 @@ export type FieldKind =
   | "select"
   | "boolean"
   | "integer"
-  | "list";
+  | "list"
+  | "ref"
+  | "refs";
 
 export type FieldDescriptor = {
   name: string;
@@ -92,7 +94,11 @@ export type FieldDescriptor = {
   help?: string;
   choices?: { value: string; label: string }[];
   fields?: FieldDescriptor[];
+  /** Reference type for "ref"/"refs" fields (e.g. "course"). */
+  ref?: string;
 };
+
+export type ReferenceOption = { id: number; label: string; description: string };
 
 export type SectionTypeInfo = {
   type: string;

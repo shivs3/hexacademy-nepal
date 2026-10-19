@@ -4,12 +4,22 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState, PageHeader } from "@/components/ui/feedback";
+import { EnrolledCourseCard } from "@/components/learning/enrolled-course-card";
+import { serverGet } from "@/lib/api/server";
 import { requireUser } from "@/lib/auth";
+import type { Paginated } from "@/types/accounts";
+import type { MyEnrollment } from "@/types/learning";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
-  const [user, { welcome }] = await Promise.all([requireUser("/dashboard"), searchParams]);
+  const [user, { welcome }, enrollments] = await Promise.all([
+    requireUser("/dashboard"),
+    searchParams,
+    serverGet<Paginated<MyEnrollment>>("/me/enrollments/", { page_size: 6 }),
+  ]);
+  const inProgress = enrollments.results.filter((e) => !e.completed_at);
+  const resume = inProgress.find((e) => e.last_accessed_at) ?? inProgress[0];
   const firstName = user.full_name.split(" ")[0] || "there";
 
   return (
@@ -24,16 +34,48 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         </Alert>
       )}
-      <EmptyState
-        icon={user.email_verified ? BookOpen : MailWarning}
-        title="You are not enrolled in any courses yet"
-        description="Once you enroll, your courses, live classes and exams will appear here."
-        action={
-          <Button asChild variant="outline">
-            <Link href="/courses">Browse courses</Link>
-          </Button>
-        }
-      />
+      {enrollments.count === 0 ? (
+        <EmptyState
+          icon={user.email_verified ? BookOpen : MailWarning}
+          title="You are not enrolled in any courses yet"
+          description="Once you enroll, your courses, live classes and exams will appear here."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/courses">Browse courses</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <div className="flex flex-col gap-8">
+          {resume && (
+            <section aria-labelledby="continue">
+              <h2 id="continue" className="mb-3 text-lg font-semibold">
+                Continue learning
+              </h2>
+              <EnrolledCourseCard enrollment={resume} featured />
+            </section>
+          )}
+          <section aria-labelledby="my-courses">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 id="my-courses" className="text-lg font-semibold">
+                My courses
+              </h2>
+              {enrollments.count > enrollments.results.length && (
+                <Link href="/dashboard/courses" className="text-sm font-medium text-teal-700 hover:underline">
+                  View all {enrollments.count}
+                </Link>
+              )}
+            </div>
+            <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {enrollments.results.map((enrollment) => (
+                <li key={enrollment.id}>
+                  <EnrolledCourseCard enrollment={enrollment} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      )}
     </>
   );
 }

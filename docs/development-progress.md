@@ -8,8 +8,8 @@ Update this file at the end of every milestone. Only record what was actually ex
 | --- | --- | --- |
 | M1 | Foundation: repo, settings, custom user, roles, auth, audit, UI kit, dashboard/admin shells, infra skeleton, docs | **Done** (infra not yet run; see below) |
 | M2 | CMS and public website: pages + versions + scheduling, section builder, menus, site settings, blog, SEO/sitemap, media library | **Done** (catalog-backed sections move to M3) |
-| M3 | Catalog and LMS: courses → modules → lessons → resources, enrollment, progress, course player, instructor tools | Next |
-| M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | Planned |
+| M3 | Catalog and LMS: courses → modules → lessons → resources, enrollment, progress, course player, instructor tools | **Done** (assignments move to M4/M6; paid enrollment waits for M5) |
+| M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | Next |
 | M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | Planned |
 | M6 | Live classes (Meet/Zoom provider abstraction) and certificates with public verification | Planned |
 | M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | Planned |
@@ -106,18 +106,63 @@ Update this file at the end of every milestone. Only record what was actually ex
 
 ### Known gaps / follow-ups
 
-- Catalog-backed sections (featured courses, course categories, instructor profiles, course collections) need M3's catalog models. They are left out of the registry, rather than shipped as placeholders.
+- ~~Catalog-backed sections need M3's catalog models.~~ Done in M3.
 - Blog posts are not versioned. Saving a published post changes the live article, so the API requires `publish_blog` to edit one (ADR-011).
 - Supported languages: only `default_language` (default `en`) is stored in site settings. Multilingual content is not implemented.
 - There is no unsubscribe link flow yet; it needs transactional email (M6/M7). `unsubscribed_at` is already modelled.
 - The CSP header is still deferred to M7. Video embeds need `frame-src` for youtube-nocookie.com and player.vimeo.com.
 
+## M3 — Catalog and LMS (completed 2026-10-20)
+
+### Built
+
+- **Backend `apps/catalog`:** `Category` (two levels), `Course` (SEO fields, decimal price and sale with an end date, featured flag, outcomes and prerequisites, sequential mode), `CourseInstructor` (instructor / teaching assistant, public flag), `CourseModule`, `Lesson` (sanitised rich text with maths, YouTube/Vimeo video, preview and published flags), `LessonResource` (private file or external link).
+  - Policies (`policies.py`): managers and publishers see every course; authors and TAs see only courses they teach; only managers change price, featured status, the team and a live course's address.
+  - Services: create (the creator joins the team), publish checks (`publish_problems`), status changes, delete rules, team replacement, full-curriculum reorder with 409 on stale input, module and lesson rules. All mutations are audited.
+  - Resources (`resources.py`): content-detected types, private storage, attachment-only delivery, signed URLs with object storage.
+  - Catalog-backed CMS sections: featured courses (featured flag, newest, or a category), course collection, course categories, instructors, with a reference picker endpoint for the page builder.
+  - `seed_catalog` command: two demo courses labelled "(Demo)", published only when `--instructor` names an account.
+- **Backend `apps/learning`:** `Enrollment` (unique per user and course; free, purchase or staff grant; revocable without losing progress) and `LessonProgress`.
+  - One access service (ADR-016), free enrollment (402 for paid courses), progress recording with server-derived course completion, learner endpoints, staff enrollment management (grant by email, revoke, reinstate, per-lesson progress) and a scoped course list for it (ADR-018).
+  - Roles: content editors get `manage_catalog` and `publish_courses`; instructors `author_assigned_courses`; support staff `manage_enrollments` and `view_learner_progress`.
+- **Public frontend:** `/courses` catalog (search, category, level, price, ordering, pagination), course page (outline, team, price, enroll panel, JSON-LD, SEO), course sections on CMS pages, courses in `sitemap.xml`.
+- **Learner frontend:** `/learn/{slug}` player with outline, lesson view (video, rich text, maths, resource downloads), locked and preview states, mark complete and continue; `/dashboard/courses` and "continue learning" on the dashboard.
+- **Staff frontend:**
+  - `/admin/catalog`: course list.
+  - Course editor: details, pricing, SEO, publish flow with listed problems, curriculum builder (modules, lessons, reorder, move between modules), teaching team.
+  - Lesson editor (body, video preview, visibility, resources with multi-file upload).
+  - `/admin/catalog/categories`.
+  - `/admin/learning/enrollments` (filters, grant, revoke and restore, progress dialog).
+  - A "Learning" nav section gated per permission.
+- **Tests:** 50 new backend tests (`apps/catalog/tests`, `apps/learning/tests`: publishing rules, field-level permissions, instructor scoping, lesson access including previews and sequential locks, revoked learners, paid-course refusal, resource validation and authorised download, CMS sections, seed). New Vitest suites `lib/catalog.test.ts`, `enroll-panel.test.tsx`, `lesson-progress.test.tsx`. New Playwright spec `e2e/learning.spec.ts`: an editor creates a course, assigns an instructor, adds a module and lesson, publishes; a new student registers, finds it, is refused the lesson before enrolling, enrolls, completes the lesson, and progress survives a reload. CI creates the instructor account it needs.
+
+### Verified (executed locally on 2026-10-20)
+
+- `pytest`: **150 passed**. `ruff check` and `ruff format --check` are clean. `makemigrations --check` reports no changes. `spectacular --validate --fail-on-warn` passes.
+- Frontend: `tsc --noEmit` and `eslint` are clean. `vitest`: **68 passed**. `next build` succeeds.
+- Playwright against the dev servers (Django + `next dev` on the local Postgres): **8/8 passed** (auth, CMS and learning specs, desktop and mobile Chromium). The courses and learner accounts it created were deleted afterwards; the `e2e-editor` and `e2e-instructor` accounts remain in the local dev database for re-runs.
+- `seed_catalog --instructor demo-instructor@example.com` published both demo courses; `/`, `/courses`, `/sitemap.xml` and the public course API return 200 through the Next proxy.
+
+### Not verified
+
+- Object storage (signed URL redirect for private files) has not run against R2; locally files are streamed from `private_media/`. The S3 branch is covered only by reading, not by a test against a bucket.
+- Docker, Nginx, Redis/Celery and CI are still unexecuted (see M1).
+
+### Known gaps / follow-ups
+
+- Paid courses can't be bought yet: the course page explains how to contact the team, and staff grant access after confirming payment. M5 adds orders and verified payments, creating `purchase` enrollments.
+- Assignments and submissions are not built; they belong with grading in M4 (or M6 with certificates).
+- Videos are YouTube/Vimeo embeds. Protected streaming needs a managed video service (documented in CLAUDE.md §16), not yet chosen.
+- `/admin/learning/courses/` is capped at 500 courses (ADR-018).
+- Course bundles and discounts beyond a single sale price come with coupons in M5.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md`.
-2. Next up is **M3**:
-   - Create `apps/catalog` (categories, courses, instructors, pricing) and `apps/learning` (modules, lessons, resources, enrollment, progress). Add their permissions to the instructor, TA and content-editor roles.
-   - Then add the catalog-backed section types to `apps/cms/sections.py`, with a matching React component in `components/cms/sections/`.
-   - Private lesson files go in the private bucket and are served through signed URLs.
-   - Start local dev with `python manage.py seed_cms` for the demo site. Run e2e with `E2E_EDITOR_EMAIL`/`E2E_EDITOR_PASSWORD` set (see `e2e/cms.spec.ts`).
+2. Next up is **M4 — exam engine** (`apps/assessments`):
+   - Subjects, topics, questions with options and a private answer table; question versions; CSV/XLSX import with an error report.
+   - Exams with validated configuration; attempts with an immutable question snapshot, a server deadline, a clear state machine (in progress → submitted/expired → finalised) and idempotent, transactional grading; answer autosave that is rejected after the deadline.
+   - Results released per exam settings; answer keys never serialised before release. Celery beat task to finalise expired attempts.
+   - Reuse the maths placeholder nodes (ADR-014) for questions, and `lesson_access`-style single access services.
+   - Local dev: `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`. Run e2e with `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD` and `E2E_INSTRUCTOR_EMAIL` set (see `e2e/learning.spec.ts`).
 3. Keep the verification bar: tests and builds must actually run before anything is marked done.

@@ -21,11 +21,13 @@ export function SeoFields({
   onChange,
   errors,
   fallbackTitle,
+  canPickImage = true,
 }: {
   value: SeoValues;
   onChange: (patch: Partial<SeoValues>) => void;
   errors: Record<string, string>;
   fallbackTitle: string;
+  canPickImage?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -56,6 +58,7 @@ export function SeoFields({
           detail={value.og_image_detail}
           onChange={(og_image, og_image_detail) => onChange({ og_image, og_image_detail })}
           invalid={Boolean(errors.og_image)}
+          readOnly={!canPickImage}
         />
         {errors.og_image ? (
           <p className="text-xs text-danger">{errors.og_image}</p>
