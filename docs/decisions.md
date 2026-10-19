@@ -40,3 +40,37 @@ Short records of choices that are expensive to reverse. Newest last.
 ## ADR-008: Trailing slashes preserved through the Next dev proxy
 
 **Decision:** `skipTrailingSlashRedirect: true` so `/api/v1/foo/` reaches Django unchanged, avoiding a 308 round trip on every API call in development. The rewrite destination appends the slash for paths written without one.
+
+## ADR-009: Page versions are immutable snapshots; drafts live on the page row
+
+**Context:** Editors need drafts, previews, history and restore without affecting the live site.
+**Decision:** `Page.sections` is the working draft. Saving with changed content creates an immutable `PageVersion` (title, sections, SEO). Publishing or scheduling points at a version, and the public API only ever serialises `published_version`. Restore copies an old version into the draft as a new version, so history is never rewritten.
+**Consequences:** Rollback is "publish an older version". Versions accumulate; pruning can be added if storage ever matters.
+
+## ADR-010: A fixed section registry instead of free-form page building
+
+**Context:** The CMS must be flexible without allowing arbitrary HTML or JavaScript.
+**Decision:** Sections are typed entries in `apps/cms/sections.py`, validated and cleaned on every write. The admin form is generated from the registry's field descriptors, and each type has one React component. Catalog-backed types (featured courses, categories, instructors, collections) are added in M3 when their data exists, rather than shipped as placeholders.
+**Consequences:** New layouts need a small code change, which is deliberate: every rendered element is reviewed and accessible.
+
+## ADR-011: Blog posts are not versioned; editing a live post needs publish rights
+
+**Context:** Articles change less often than landing pages, and full versioning doubles the editor's complexity.
+**Decision:** Posts have draft/published/archived status and an optional future `published_at` (scheduling) but no version history. Because a save changes a live article immediately, the API requires `publish_blog` to edit a published post. Writers without it can only work on drafts.
+**Consequences:** No rollback for posts. If that becomes necessary, reuse the page versioning pattern.
+
+## ADR-012: Previews use the staff session, not share tokens
+
+**Decision:** `/preview/pages/{id}` and `/preview/posts/{id}` are Next routes that call staff-only preview endpoints with the visitor's cookies, and they are disallowed in robots.txt and marked noindex.
+**Consequences:** Previews cannot be shared with people who lack an account. A signed, expiring share link can be added later if that is needed.
+
+## ADR-013: Media images are served unoptimised by Next
+
+**Context:** The Next image optimiser would need every storage host whitelisted and would proxy all images through the frontend server.
+**Decision:** The backend validates and re-encodes uploads. `MediaImage` renders them with `unoptimized` plus explicit width and height (no layout shift) and lazy loading. Edge caching comes from Cloudflare.
+**Consequences:** No automatic responsive resizing. Revisit if image weight becomes a performance problem (for example, Cloudflare Images or generating variants at upload time).
+
+## ADR-014: Maths stored as placeholder nodes, rendered at view time
+
+**Decision:** The Tiptap editor stores formulas as `<span|div data-type="inline-math|block-math" data-latex="…">` nodes, which survive the backend allowlist. They are rendered with KaTeX (`trust: false`, bounded `maxExpand`/`maxSize`) on the server when the page is rendered. The stored HTML never contains KaTeX output.
+**Consequences:** Upgrading KaTeX re-renders everything consistently. The same nodes will be reused for lesson content and exam questions (M3/M4).

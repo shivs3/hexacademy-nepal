@@ -83,6 +83,9 @@ jobs:
     env:
       DATABASE_URL: postgres://ci:ci@localhost:5432/hexacademy_e2e
       DJANGO_SETTINGS_MODULE: config.settings.dev
+      # Throwaway account in the disposable CI database only.
+      E2E_EDITOR_EMAIL: e2e-editor@example.com
+      E2E_EDITOR_PASSWORD: ci-only-E2E-editor-91
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -99,6 +102,13 @@ jobs:
         run: |
           pip install -r requirements.txt
           python manage.py migrate --noinput
+          python manage.py shell -c "
+          import os
+          from django.utils import timezone
+          from apps.accounts.models import User
+          u = User.objects.create_user(email=os.environ['E2E_EDITOR_EMAIL'], password=os.environ['E2E_EDITOR_PASSWORD'], full_name='E2E Editor')
+          u.is_staff = True; u.email_verified_at = timezone.now(); u.save()"
+          python manage.py grant_role "$E2E_EDITOR_EMAIL" --role content_editor
           python manage.py runserver 127.0.0.1:8000 > /tmp/django.log 2>&1 &
       - working-directory: frontend
         run: |

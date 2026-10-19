@@ -39,7 +39,17 @@ ROLES: dict[str, Role] = {
         CONTENT_EDITOR,
         "Content Editor",
         "Manages website pages, blog, media, navigation and the public course catalog.",
-        (_ADMIN_PANEL,),
+        (
+            _ADMIN_PANEL,
+            "cms.manage_pages",
+            "cms.publish_pages",
+            "cms.manage_media",
+            "cms.manage_menus",
+            "cms.manage_site_settings",
+            "cms.manage_blog",
+            "cms.publish_blog",
+            "cms.view_newsletter_subscribers",
+        ),
     ),
     INSTRUCTOR: Role(
         INSTRUCTOR,

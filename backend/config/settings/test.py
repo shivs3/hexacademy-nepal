@@ -27,5 +27,6 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
     "password_reset": "1000/min",
     "email_verify": "1000/min",
     "exam_answer": "10000/min",
+    "newsletter": "1000/min",
 }
 LOGGING["root"]["level"] = "WARNING"  # noqa: F405

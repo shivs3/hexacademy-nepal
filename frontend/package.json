@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
+    "@tiptap/core": "^3.32.0",
     "@tiptap/extension-link": "^3.32.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",

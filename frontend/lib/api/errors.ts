@@ -24,10 +24,18 @@ export class ApiError extends Error {
   fieldErrors(): Record<string, string> {
     const out: Record<string, string> = {};
     if (!this.details || Array.isArray(this.details)) return out;
-    for (const [field, value] of Object.entries(this.details)) {
-      if (Array.isArray(value) && value.length) out[field] = String(value[0]);
-      else if (typeof value === "string") out[field] = value;
-    }
+    // Nested serializer errors ({items: [{}, {label: ["…"]}]}) become dotted keys ("items.1.label").
+    const walk = (value: unknown, key: string) => {
+      if (typeof value === "string") {
+        if (!(key in out)) out[key] = value;
+      } else if (Array.isArray(value)) {
+        if (value.length && value.every((v) => typeof v === "string")) walk(value[0], key);
+        else value.forEach((v, i) => walk(v, `${key}.${i}`));
+      } else if (value && typeof value === "object") {
+        for (const [k, v] of Object.entries(value)) walk(v, key ? `${key}.${k}` : k);
+      }
+    };
+    walk(this.details, "");
     return out;
   }
 }

@@ -53,6 +53,10 @@ npm run lint && npm run typecheck && npm test && npm run build
 npm run e2e                      # needs both dev servers running; uses the dev database
 ```
 
+The CMS end-to-end test is skipped unless `E2E_EDITOR_EMAIL` and `E2E_EDITOR_PASSWORD` name a staff account with the
+`content_editor` role (`python manage.py grant_role <email> --role content_editor`). Demo CMS content:
+`python manage.py seed_cms`.
+
 ## Production
 
 `docker compose up -d --build` with a filled-in `.env`. Read [docs/deployment.md](docs/deployment.md) first.

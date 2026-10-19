@@ -35,6 +35,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "apps.accounts",
     "apps.audit",
+    "apps.cms",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -204,6 +205,7 @@ REST_FRAMEWORK = {
         "password_reset": "5/hour",
         "email_verify": "10/hour",
         "exam_answer": "240/min",
+        "newsletter": "10/hour",
     },
 }
 
@@ -240,7 +242,9 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_TIMEZONE = TIME_ZONE
 # Periodic jobs are registered by each app as it lands (see the app's tasks.py
 # and the matching entry here). Unknown task names would only produce errors.
-CELERY_BEAT_SCHEDULE: dict[str, dict] = {}
+CELERY_BEAT_SCHEDULE: dict[str, dict] = {
+    "cms-publish-scheduled-pages": {"task": "apps.cms.tasks.publish_scheduled_pages", "schedule": 60.0},
+}
 
 # --- Payments. Credentials are only read from the environment.
 PAYMENTS = {

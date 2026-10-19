@@ -28,7 +28,14 @@
 - (M3) Private files (course videos, resources, certificates) live in a private bucket and are delivered via signed URLs (default 5 minutes) after a permission check.
 - Audit metadata automatically redacts keys such as `password`, `token`, `secret`, `correct_option_ids`, etc.
 - Gunicorn and Nginx access logs record paths without query strings, since links carry one-time tokens.
-- (M2) Rich text from the CMS is sanitised server-side (nh3) and again on render (DOMPurify). Arbitrary HTML/JS embeds are not supported.
+- **CMS content (M2):**
+  - Rich text is sanitised server-side with an nh3 allowlist (no scripts, styles, iframes or event handlers) and again on render with DOMPurify. KaTeX runs with `trust: false`. Administrators cannot add arbitrary HTML, JS or embeds: section types are a fixed, validated registry.
+  - Every CMS link (menus, buttons, rich-text anchors) must be a site path, `#anchor`, http(s) URL with a host, `mailto:` or `tel:`. `javascript:`, `data:` and protocol-relative URLs are refused. Video embeds are limited to YouTube (privacy-enhanced domain) and Vimeo (`dnt=1`) and are rebuilt from the video id, never copied verbatim.
+  - Unpublished content never reaches public endpoints: public views read only the published version or published posts whose date has passed. Previews require a staff session with the editing permission.
+  - Publishing is a separate permission (`publish_pages`, `publish_blog`). Since blog posts are not versioned, editing a live post also requires `publish_blog`.
+  - Uploads: the type is detected from the file's content (never from the client-supplied name or MIME type), with an allowlist of JPEG, PNG, WebP, GIF and PDF and size and pixel limits. JPEG and WebP are re-encoded to remove EXIF and GPS data. SVG and HTML are refused. Storage keys are random. Only `manage_media` may upload or delete.
+  - Brand colours must keep sufficient contrast with white text, so an admin cannot make buttons unreadable.
+  - The newsletter subscribe endpoint is throttled and returns the same response whether or not the address exists. The CSV export is audited and neutralises spreadsheet formulas.
 
 ## Transport and headers
 
