@@ -5,6 +5,7 @@ export type RoleSlug =
   | "teaching_assistant"
   | "finance_manager"
   | "support_staff"
+  | "exam_coordinator"
   | "student";
 
 export type Profile = {

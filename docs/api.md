@@ -127,6 +127,41 @@ Lesson access: a published free-preview lesson of a published course; or an acti
 | GET | `/admin/learning/courses/` | access_admin_panel. Non-draft courses the caller may see enrollments for (filter and grant options) |
 | GET | `/admin/cms/references/{course\|course_category}/` | manage_pages. `?search=` or `?ids=` options for catalog-backed CMS sections |
 
+## Exams (M4)
+
+### Learner
+
+Learners see published and closed exams that are open to everyone, belong to a course they are actively enrolled in, or that they have already attempted. Every attempt endpoint is scoped to the caller's own attempts; anyone else's id answers 404.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/exams/` | `?course=<slug> ?kind=practice\|formal`, paginated. Includes availability and attempts used |
+| GET | `/exams/{slug}/` | Settings, instructions, own attempts, `can_start` / reason |
+| POST | `/exams/{slug}/attempts/` | Starts an attempt (201) or returns the open one (200). Refusals: 404 `unavailable`, 403 `not_open`, `closed`, `not_enrolled`, `no_attempts_left` |
+| GET | `/attempts/{id}/` | Questions (no key, no explanation), saved answers, `deadline`, `server_time`, `furthest_position`. An overdue attempt is finalised first |
+| PUT | `/attempts/{id}/answers/{question_id}/` | `{selected: [option ids], flagged}`, where `question_id` is the attempt question id. Returns `{question, selected, flagged, saved_at}`. 409 `attempt_closed` (after the deadline plus the grace window; the attempt is finalised as expired), 409 `no_revisit`, 400 `invalid_option`. Throttle scope `exam_answer` |
+| POST | `/attempts/{id}/advance/` | `{position}`. Records forward movement; needed when the exam does not allow revisiting |
+| POST | `/attempts/{id}/submit/` | Idempotent: ends and grades the attempt once; repeats return the same result |
+| GET | `/attempts/{id}/result/` | `{attempt, exam, released, release_note, summary, topics, review, ranking}`. Before release only `released: false` and the note. `review[].correct_options` only when `show_answers`, `explanation` only when `show_explanations`. `ranking` (initials only) when enabled |
+| GET | `/me/exam-attempts/` | Own attempt history, newest first, `?exam=<slug>` |
+
+### Staff
+
+| Method | Path | Permission |
+| --- | --- | --- |
+| GET/POST/PATCH/DELETE | `/admin/assessments/subjects/`, `/admin/assessments/topics/` | Read: anyone who may open the bank. Write: manage_question_bank |
+| GET/POST | `/admin/assessments/questions/` | List: bank managers see all; exam managers see active questions; authors see their courses' questions plus active shared ones. `?search= ?subject= ?topic= ?status= ?kind= ?difficulty= ?tag= ?course=` |
+| GET/PATCH/DELETE | `/admin/assessments/questions/{id}/` | Edit: bank managers, or instructors of the question's course. Content changes create a new version. A question used by an exam can only be retired |
+| GET | `…/questions/{id}/versions/` | Version history |
+| POST | `/admin/assessments/questions/import/` | Multipart CSV/XLSX. All or nothing; 400 with a per-row error report. Format in `apps/assessments/importer.py` |
+| GET | `/admin/assessments/questions/export/` | CSV including answers, limited to questions the caller may edit (max 5,000 rows). Audited |
+| GET/POST/PATCH/DELETE | `/admin/assessments/exams/` | Visible: exam managers all; authors their courses; TAs their courses (read only). Scoring fields (course, kind, question count, negative marking, pass marks, duration, shuffles) only change in draft. Delete: drafts without attempts |
+| GET/PUT | `…/exams/{id}/questions/` | PUT replaces the list `{questions: [{question, marks?, negative_marks?}]}` (draft only, max 300) |
+| POST | `…/exams/{id}/status/` `{status}` | Publishing returns 400 `exam_not_ready` listing every problem; an exam with attempts cannot return to draft |
+| POST | `…/exams/{id}/publish-results/` | Manual-release exams only |
+| GET | `…/exams/{id}/attempts/`, `…/analytics/`, `…/results-export/` | Results, per-question difficulty and score spread, CSV export |
+| GET | `/admin/assessments/course-options/` | Courses the caller may attach an exam to |
+
 ## Operations
 
 | Path | Purpose |

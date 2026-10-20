@@ -92,6 +92,36 @@ Revoking keeps the enrollment row and its progress, so restoring access loses no
 
 Custom permissions: `catalog.manage_catalog`, `publish_courses`, `author_assigned_courses`; `learning.manage_enrollments`, `view_learner_progress`.
 
+## Assessment tables (M4)
+
+```
+Subject ──< Topic ──< Topic                 subtopics (two levels), CASCADE
+Question ──► Subject (PROTECT), Topic (SET_NULL), Course (SET_NULL; null = shared bank), MediaAsset image (SET_NULL)
+Question ──< QuestionOption                 CASCADE; is_correct is the private key
+Question ──< QuestionVersion                CASCADE; immutable copy after each content change
+Exam ──► Course                             PROTECT; null = open to every signed-in learner
+Exam ──< ExamQuestion >── Question          question PROTECT (retire, never delete a used question)
+ExamAttempt ──► Exam (PROTECT), User (CASCADE)
+ExamAttempt ──< AttemptQuestion ──1 AttemptAnswer   CASCADE; AttemptQuestion.question SET_NULL
+```
+
+| Table | Key columns and rules |
+| --- | --- |
+| `assessments_subject` | `name`, `slug` unique, `description`, `position` |
+| `assessments_topic` | `subject`, `parent` (subtopic), `name`, `slug`. Unique `(subject, slug)` |
+| `assessments_question` | `kind` single/multiple/true_false, `status` draft/active/retired (indexed), `difficulty`, `prompt` (sanitised HTML with maths nodes), `explanation`, `tags` (text array, GIN index), `default_marks` (`CHECK` > 0), `default_negative_marks` (`CHECK` ≥ 0), `version`. Indexes `(subject, status)`, `(topic, status)` |
+| `assessments_questionoption` | `text`, `image`, `is_correct`, `position`. Never serialised to learners |
+| `assessments_questionversion` | `(question, version)` unique, `snapshot` JSON (content and key) |
+| `assessments_exam` | `slug` unique, `title`, `instructions`, `kind` practice/formal, `status` draft/published/closed, `duration_minutes` (1–600), `opens_at` / `closes_at` (`CHECK`: closes after opens), `question_count` (null = all; `CHECK` > 0), shuffle flags, `negative_marking`, `pass_marks`, `max_attempts` (null = unlimited; `CHECK` > 0), `allow_revisit`, `result_release` immediate/after_close/manual, `results_published_at`, `show_answers`, `show_explanations`, `ranking_enabled`. Index `(status, course)` |
+| `assessments_examquestion` | Unique `(exam, question)`, `position`, `marks` (`CHECK` > 0), `negative_marks` (`CHECK` ≥ 0) |
+| `assessments_examattempt` | `number`, `status` in_progress/submitted/expired, `started_at`, `deadline` (indexed), `ended_at`, `graded_at`, `furthest_position`, `score`, `max_score`, correct/incorrect/unanswered counts, `passed`. Unique `(exam, user, number)`; **partial unique `(exam, user)` where in progress** (one open attempt); `CHECK`: in progress ⇔ `ended_at` and `graded_at` null |
+| `assessments_attemptquestion` | The frozen snapshot: `position` (unique per attempt), `question_version`, `kind`, `subject_name`, `topic_name`, `content` (learner-visible JSON, options in display order), `answer_key` (sorted option ids), `explanation`, `marks`, `negative_marks` |
+| `assessments_attemptanswer` | One per attempt question: `selected` (sorted ids), `flagged`, `saved_at`; `is_correct` and `awarded_marks` are written by grading only |
+
+Marks are `Decimal(6, 2)`. Grading reads only the attempt's snapshot, so editing or retiring a question never changes an existing attempt. Exams with attempts cannot be deleted (`PROTECT`) or returned to draft.
+
+Custom permissions: `assessments.manage_question_bank`, `manage_exams`, `author_course_assessments`.
+
 ## Backups
 
 See [deployment.md](deployment.md#backups). Use `pg_dump` custom format daily, keep copies off-host, and test restores.

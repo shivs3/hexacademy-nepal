@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell, type NavItem, type NavSection } from "@/components/shell/app-shell";
 import { requireStaff } from "@/lib/auth";
-import { canOpenCatalog, canOpenEnrollments, hasAnyPerm, hasPerm } from "@/lib/permissions";
+import { canOpenBank, canOpenCatalog, canOpenEnrollments, canOpenExams, hasAnyPerm, hasPerm } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: { default: "Staff", template: "%s | Staff | Hexacademy Nepal" }, robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -20,6 +20,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     learning.push({ href: "/admin/catalog/categories", label: "Course categories", icon: "categories" });
   if (canOpenEnrollments(user)) learning.push({ href: "/admin/learning/enrollments", label: "Enrollments", icon: "enrollments" });
 
+  const assessments: NavItem[] = [];
+  if (canOpenExams(user)) assessments.push({ href: "/admin/assessments/exams", label: "Exams", icon: "exams" });
+  if (canOpenBank(user)) assessments.push({ href: "/admin/assessments/questions", label: "Question bank", icon: "bank" });
+  if (hasPerm(user, "assessments.manage_question_bank"))
+    assessments.push({ href: "/admin/assessments/subjects", label: "Subjects & topics", icon: "categories" });
+
   const website: NavItem[] = [];
   if (hasAnyPerm(user, ["cms.manage_pages", "cms.manage_blog", "cms.manage_media"]))
     website.push({ href: "/admin/cms", label: "Website overview", icon: "website", exact: true });
@@ -35,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const sections: NavSection[] = [
     { items: [{ href: "/admin", label: "Overview", icon: "dashboard", exact: true }] },
     ...(learning.length ? [{ title: "Learning", items: learning }] : []),
+    ...(assessments.length ? [{ title: "Assessments", items: assessments }] : []),
     ...(website.length ? [{ title: "Website", items: website }] : []),
     ...(people.length ? [{ title: "People", items: people }] : []),
   ];

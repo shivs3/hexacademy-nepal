@@ -9,8 +9,8 @@ Update this file at the end of every milestone. Only record what was actually ex
 | M1 | Foundation: repo, settings, custom user, roles, auth, audit, UI kit, dashboard/admin shells, infra skeleton, docs | **Done** (infra not yet run; see below) |
 | M2 | CMS and public website: pages + versions + scheduling, section builder, menus, site settings, blog, SEO/sitemap, media library | **Done** (catalog-backed sections move to M3) |
 | M3 | Catalog and LMS: courses → modules → lessons → resources, enrollment, progress, course player, instructor tools | **Done** (assignments move to M4/M6; paid enrollment waits for M5) |
-| M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | Next |
-| M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | Planned |
+| M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | **Done** (assignments move to M6) |
+| M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | Next |
 | M6 | Live classes (Meet/Zoom provider abstraction) and certificates with public verification | Planned |
 | M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | Planned |
 
@@ -156,13 +156,82 @@ Update this file at the end of every milestone. Only record what was actually ex
 - `/admin/learning/courses/` is capped at 500 courses (ADR-018).
 - Course bundles and discounts beyond a single sale price come with coupons in M5.
 
+## M4 — Exam engine (completed 2026-10-20)
+
+### Built
+
+- **Backend `apps/assessments`:**
+  - **Models:** `Subject`, `Topic` (with subtopics), `Question` (single, multiple, true/false; maths; image; tags; marks; status), `QuestionOption` (private `is_correct`), `QuestionVersion`, `Exam` (full configuration), `ExamQuestion`, `ExamAttempt`, `AttemptQuestion` (snapshot), `AttemptAnswer`. DB constraints are described in `database.md`.
+  - **Policies:** a new Exam Coordinator role (ADR-025). Instructors author for courses they teach; TAs read their courses' exams and results.
+  - **Bank:** question CRUD with versioning on content change; questions used by an exam can only be retired. CSV/XLSX import is all or nothing, with a per-row report; CSV export.
+  - **Exams:**
+    - Validated configuration, plus publish checks that list every problem at once.
+    - Scoring is frozen after publish (ADR-024). The question list is replaced in one go.
+    - Status changes, manual result release, staff results list, analytics and CSV export.
+  - **Attempts** (`attempts.py`):
+    - Eligibility (window, enrollment, attempt limit) and one open attempt per learner.
+    - A snapshot is taken at start, with random draws and shuffles from `SystemRandom`. The server sets the deadline.
+    - Answer saves are validated against the snapshot. A no-revisit mode is available.
+    - Finalisation is idempotent and runs under a row lock (ADR-021), with a 5 s grace window (ADR-022). Grading follows ADR-023.
+    - A Celery beat task finalises abandoned attempts every minute; reads also finalise overdue attempts.
+  - **Results** (`results.py`):
+    - Release modes: immediate, after close, or manual.
+    - Summary, topic breakdown, and a review whose answers and explanations each follow their own exam flag.
+    - Rankings show initials only. Learners have attempt history; staff get analytics.
+- **Staff frontend:**
+  - `/admin/assessments/subjects`: subjects and topics.
+  - `/admin/assessments/questions`: list with filters, an editor with maths, images, options and versions, and an import dialog with an error report.
+  - `/admin/assessments/exams`: list and editor with tabs for settings, questions (picker, marks, order) and results (analytics, attempts, export). Includes the publish flow.
+  - Nav entries are gated per permission.
+- **Learner frontend:**
+  - `/dashboard/exams`: list and attempt history with a trend chart.
+  - `/dashboard/exams/{slug}`: rules, instructions, attempts, start or resume.
+  - `/exam/{attemptId}`: the full-screen player.
+    - Countdown corrected by the server clock, with auto-submit at the deadline and a resync when the tab becomes visible.
+    - Autosave queue with offline retry and an honest save indicator.
+    - Flags, question navigator, no-revisit mode, and a submit dialog with counts.
+  - `/dashboard/exams/results/{id}`: score, topic chart and table, ranking, answer review.
+  - The dashboard shows upcoming exams and recent results.
+- **Fix found by E2E:** the answer queue's unmount cleanup set a "stopped" flag that React Strict Mode's remount never reset, so in development no answer was ever saved. It now resets on mount, and a Strict Mode regression test fails without the fix.
+- **Dev/CI:** `DJANGO_E2E_RELAXED_THROTTLES=true`, read only by dev settings, raises the login and register limits for E2E runs. CI sets it and grants the E2E editor `exam_coordinator`.
+- **Tests:**
+  - 55 new backend tests in `apps/assessments/tests`: bank permissions and key privacy, versions, import (dry run, error report, XLSX) and export, publish checks, scoring freeze, eligibility, snapshots, deadline and grace, no-revisit, concurrent start (database constraint), duplicate submit and double finalise, expiry task, grading rules, release modes, review flags, ranking privacy, analytics.
+  - New Vitest suites: `lib/assessments.test.ts` and `exam-player.test.tsx` (9 tests).
+  - New Playwright spec `e2e/exams.spec.ts`:
+    - A coordinator builds and publishes an exam through the UI.
+    - A new learner takes it. The attempt payload has no key, an answer survives a reload, and the learner submits.
+    - The server grades it 1/2. A late save is refused, and other users can't read the attempt.
+
+### Verified (executed locally on 2026-10-20)
+
+- Backend: `pytest` reports **205 passed**. `ruff check` is clean. `makemigrations --check` reports no changes. `spectacular --validate --fail-on-warn` passes.
+- Frontend: `tsc --noEmit` and `eslint` are clean. `vitest` reports **86 passed**. `next build` succeeds, and the new routes are listed.
+- Playwright against the dev servers (Django with `DJANGO_E2E_RELAXED_THROTTLES=true` + `next dev`): **10/10 passed** in one run (auth, CMS, learning, exams; desktop and mobile Chromium).
+- Without the relaxed setting, running both projects back to back trips the real register/login throttles. That is expected behaviour, not a failure.
+
+### Not verified
+
+- The beat task has been tested by calling it directly. Celery/Redis are still not run locally (see M1).
+- XLSX import is covered by tests with generated workbooks only, not with files exported from Excel or Google Sheets.
+
+### Known gaps / follow-ups
+
+- No regrade tool for fixing a wrong key after attempts exist (ADR-020).
+- No partial credit option (ADR-023).
+- Question images are public media (ADR-026).
+- Assignments and submissions move to M6 with certificates.
+- Anti-cheating is limited to what `security.md` lists; there is no proctoring.
+
 ## How to continue
 
-1. Read this file, then `docs/architecture.md`.
-2. Next up is **M4 — exam engine** (`apps/assessments`):
-   - Subjects, topics, questions with options and a private answer table; question versions; CSV/XLSX import with an error report.
-   - Exams with validated configuration; attempts with an immutable question snapshot, a server deadline, a clear state machine (in progress → submitted/expired → finalised) and idempotent, transactional grading; answer autosave that is rejected after the deadline.
-   - Results released per exam settings; answer keys never serialised before release. Celery beat task to finalise expired attempts.
-   - Reuse the maths placeholder nodes (ADR-014) for questions, and `lesson_access`-style single access services.
-   - Local dev: `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`. Run e2e with `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD` and `E2E_INSTRUCTOR_EMAIL` set (see `e2e/learning.spec.ts`).
-3. Keep the verification bar: tests and builds must actually run before anything is marked done.
+1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.
+2. Next up is **M5: commerce** (`apps/commerce`):
+   - Orders and order items that snapshot names and prices (Decimal), coupons and redemptions, payments and payment events, and refunds.
+   - A provider abstraction. Khalti and eSewa must follow their **official** documentation only: no invented endpoints, signatures or env vars. Where the docs can't be confirmed, ship the sandbox provider (`PAYMENTS["ENABLE_SANDBOX_PROVIDER"]` already exists in settings) and document the activation steps.
+   - Server-side verification of every callback, idempotent webhook processing, and `purchase` enrollments created only after verified payment (reuse `apps/learning` services).
+   - Manual bank-transfer verification (audited), order history, and reconciliation and revenue reports for finance managers. Finance must not gain exam or security access.
+3. Local dev:
+   - `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`.
+   - E2E needs `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD` and `E2E_INSTRUCTOR_EMAIL`. The editor needs the `content_editor` and `exam_coordinator` roles.
+   - Start Django with `DJANGO_E2E_RELAXED_THROTTLES=true` for full E2E runs.
+4. Keep the verification bar: tests and builds must actually run before anything is marked done.

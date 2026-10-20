@@ -12,3 +12,12 @@ EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.
 
 PAYMENTS["ENABLE_SANDBOX_PROVIDER"] = env.bool("PAYMENTS_ENABLE_SANDBOX", default=True)  # noqa: F405
 PAYMENTS["SANDBOX_SECRET"] = env("PAYMENTS_SANDBOX_SECRET", default="dev-sandbox-secret")  # noqa: F405
+
+# End-to-end suites register and sign in many accounts within a minute. Opt in
+# for those runs only; the default keeps the real limits so throttling is visible.
+if env.bool("DJANGO_E2E_RELAXED_THROTTLES", default=False):
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
+        **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],  # noqa: F405
+        "login": "300/min",
+        "register": "300/min",
+    }

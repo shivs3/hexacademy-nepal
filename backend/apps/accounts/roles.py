@@ -30,6 +30,7 @@ INSTRUCTOR = "instructor"
 TEACHING_ASSISTANT = "teaching_assistant"
 FINANCE_MANAGER = "finance_manager"
 SUPPORT_STAFF = "support_staff"
+EXAM_COORDINATOR = "exam_coordinator"
 STUDENT = "student"
 
 _ADMIN_PANEL = "accounts.access_admin_panel"
@@ -57,7 +58,13 @@ ROLES: dict[str, Role] = {
         INSTRUCTOR,
         "Instructor",
         "Authors and teaches assigned courses, exams and live classes.",
-        (_ADMIN_PANEL, "catalog.author_assigned_courses"),
+        (_ADMIN_PANEL, "catalog.author_assigned_courses", "assessments.author_course_assessments"),
+    ),
+    EXAM_COORDINATOR: Role(
+        EXAM_COORDINATOR,
+        "Exam Coordinator",
+        "Manages the whole question bank (including answer keys), every exam and every result.",
+        (_ADMIN_PANEL, "assessments.manage_question_bank", "assessments.manage_exams"),
     ),
     TEACHING_ASSISTANT: Role(
         TEACHING_ASSISTANT,

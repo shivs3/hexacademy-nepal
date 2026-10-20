@@ -52,7 +52,16 @@
 
 ## Exams (M4)
 
-Attempts are server-authoritative. A question snapshot is frozen at start, and the deadline is computed by the server. Answers are rejected after the deadline, and grading is idempotent. Answer keys are never serialised to students before results are released.
+- **Answer keys stay on the server.** Learner serializers are separate from staff ones and never include `is_correct`, `answer_key` or explanations. The attempt payload carries only the snapshot's `content`. The result endpoint adds correct options and explanations only after release, and only when the exam's `show_answers` / `show_explanations` allow it. An E2E test asserts the attempt payload contains no key.
+- **Who sees keys:** exam coordinators (`manage_question_bank`) and instructors for their own courses' questions. Content editors, finance and support staff have no assessment permissions. Teaching assistants see exams and results, never the bank.
+- **Server time only.** The deadline is `min(start + duration, closes_at)`, computed once when the attempt starts. The browser countdown is corrected by the server's clock and is display only. Saves are accepted up to 5 seconds (`ASSESSMENTS_ANSWER_GRACE_SECONDS`) past the deadline to absorb network latency; after that they get 409 and the attempt is finalised. A Celery beat task finalises abandoned attempts every minute, and any read of an overdue attempt finalises it too.
+- **No client-supplied correctness.** The client sends only selected option ids, validated against the snapshot. Grading, scores and pass/fail are computed on the server, in the same transaction that ends the attempt, under a row lock, so they run at most once.
+- **Object access.** Attempts are looked up by `(id, user)`; other users get 404, not 403, so ids cannot be probed.
+- **Randomness** for question draws and shuffles uses `random.SystemRandom`.
+- **Rankings** show initials only, plus the viewer's own row.
+- **Audit:** question creation, imports, exports and deletions; exam creation, edits, question lists, status changes and result publication and export; attempt starts and submissions are recorded in the audit log. Answer contents are not logged.
+
+**Limitations (cheating).** A browser exam cannot stop a learner from using another device, another person, or copying questions. The platform does not lock the browser, watch the camera or detect tab switching. What it does: server-enforced timing, per-attempt shuffling and random draws, optional no-revisit mode, limited attempts, delayed result and answer release, and analytics staff can review. High-stakes exams should add supervision outside the platform.
 
 ## Payments (M5)
 

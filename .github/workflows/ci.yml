@@ -83,6 +83,7 @@ jobs:
     env:
       DATABASE_URL: postgres://ci:ci@localhost:5432/hexacademy_e2e
       DJANGO_SETTINGS_MODULE: config.settings.dev
+      DJANGO_E2E_RELAXED_THROTTLES: "true"
       # Throwaway account in the disposable CI database only.
       E2E_EDITOR_EMAIL: e2e-editor@example.com
       E2E_EDITOR_PASSWORD: ci-only-E2E-editor-91
@@ -111,6 +112,7 @@ jobs:
           u.is_staff = True; u.email_verified_at = timezone.now(); u.save()
           User.objects.create_user(email=os.environ['E2E_INSTRUCTOR_EMAIL'], password=None, full_name='E2E Instructor', is_staff=True)"
           python manage.py grant_role "$E2E_EDITOR_EMAIL" --role content_editor
+          python manage.py grant_role "$E2E_EDITOR_EMAIL" --role exam_coordinator
           python manage.py grant_role "$E2E_INSTRUCTOR_EMAIL" --role instructor
           python manage.py runserver 127.0.0.1:8000 > /tmp/django.log 2>&1 &
       - working-directory: frontend

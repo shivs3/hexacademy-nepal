@@ -55,7 +55,10 @@ npm run e2e                      # needs both dev servers running; uses the dev 
 
 The CMS and learning end-to-end tests are skipped unless `E2E_EDITOR_EMAIL` and `E2E_EDITOR_PASSWORD` name a staff
 account with the `content_editor` role (`python manage.py grant_role <email> --role content_editor`). The learning test
-also needs `E2E_INSTRUCTOR_EMAIL`, an account with the `instructor` role.
+also needs `E2E_INSTRUCTOR_EMAIL`, an account with the `instructor` role. The exams test also needs the editor to hold the `exam_coordinator` role
+(`python manage.py grant_role <email> --role exam_coordinator`). The suite registers and signs in many accounts, so start
+the local Django server with `DJANGO_E2E_RELAXED_THROTTLES=true` (development settings only) or the real login and
+registration limits will throttle a full run.
 
 Demo content, clearly labelled as such: `python manage.py seed_cms` (pages, menus, settings) and
 `python manage.py seed_catalog --instructor <email>` (two demo courses; without `--instructor` they stay drafts).

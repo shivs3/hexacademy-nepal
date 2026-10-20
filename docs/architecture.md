@@ -72,14 +72,27 @@ frontend/
 - `apps/learning` owns who learns: enrollments and lesson progress. `services.py` is the single place that answers "may this user open this lesson" and derives course completion.
 - The public course page and the player are server components that call the API with the visitor's cookies. Progress buttons are small client components that post to the API and refresh.
 
+## Exams (M4)
+
+- `apps/assessments` owns the question bank, exams, attempts and results.
+  - `policies.py`: who may see and change questions, exams and results.
+  - `services.py`: bank and exam rules (versions, publish checks, freezing scoring fields after publish).
+  - `importer.py`: CSV/XLSX import and export.
+  - `attempts.py`: the attempt state machine (start, save, advance, submit, expire, grade).
+  - `results.py`: release rules, review, topics, ranking and analytics.
+  - `tasks.py`: the beat job that finalises overdue attempts.
+- An attempt copies everything it needs (content, key, marks) into `AttemptQuestion` rows at start. Grading and review read only those rows.
+- The learner player (`/exam/[attemptId]`) is a client component. It renders the server's attempt, queues answer saves one at a time (`use-answer-queue.ts`), and retries when offline. It submits on the server deadline. The result page is a server component.
+
 ## Roles
 
 | Role | Scope |
 | --- | --- |
 | Super admin | Everything. Granted only from the CLI (`grant_role`), audited. |
 | Content editor | CMS pages (incl. publishing), menus, site settings, blog, media, newsletter list (M2); public catalog (M3) |
-| Instructor | Own courses, lessons, question bank, exams, live sessions (M3–M6) |
-| Teaching assistant | Assigned courses: read-only course view and learner progress (M3); grading support, attendance (M4–M6) |
+| Instructor | Own courses and lessons (M3); questions and exams for courses they teach, plus read access to the shared active bank (M4); live sessions (M6) |
+| Teaching assistant | Assigned courses: read-only course view and learner progress (M3); their courses' exams and results, never the bank (M4); attendance (M6) |
+| Exam coordinator | The whole question bank including answer keys, every exam and every result (M4) |
 | Finance manager | Orders, payments, refunds, coupons. No answer keys or security settings (M5) |
 | Support staff | User directory, activate/deactivate accounts, enrollments (grant, revoke, progress) |
 | Student | Own learning, exams, orders, certificates |
@@ -88,4 +101,4 @@ The UI hides what a user cannot use, but **every check is enforced again in the 
 
 ## Background jobs
 
-Celery runs in a worker plus beat. Without `REDIS_URL` (local dev and tests) tasks run eagerly. Each app adds its periodic jobs to `CELERY_BEAT_SCHEDULE` when it lands, for example exam-attempt finalisation (M4), class reminders (M6) and scheduled page publishing (M2).
+Celery runs in a worker plus beat. Without `REDIS_URL` (local dev and tests) tasks run eagerly. Each app adds its periodic jobs to `CELERY_BEAT_SCHEDULE` when it lands, for example exam-attempt finalisation (M4, every minute), class reminders (M6) and scheduled page publishing (M2).

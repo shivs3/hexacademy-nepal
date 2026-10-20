@@ -31,3 +31,14 @@ export function canOpenEnrollments(user: Pick<CurrentUser, "permissions" | "is_s
     user.roles.includes("teaching_assistant")
   );
 }
+
+/** Question bank: managers, and instructors authoring their own courses' questions. */
+export function canOpenBank(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
+  return hasAnyPerm(user, ["assessments.manage_question_bank", "assessments.manage_exams", "assessments.author_course_assessments"]);
+}
+
+/** Exams: managers, course authors, and teaching assistants (results of their courses' exams). */
+export function canOpenExams(user: Pick<CurrentUser, "permissions" | "is_superuser" | "roles"> | null): boolean {
+  if (!user) return false;
+  return canOpenBank(user) || user.roles.includes("teaching_assistant");
+}

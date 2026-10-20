@@ -38,6 +38,7 @@ LOCAL_APPS = [
     "apps.cms",
     "apps.catalog",
     "apps.learning",
+    "apps.assessments",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -224,6 +225,11 @@ SPECTACULAR_SETTINGS = {
         "MediaKindEnum": "apps.cms.models.MediaAsset.Kind",
         "ResourceKindEnum": "apps.catalog.models.LessonResource.Kind",
         "LanguageEnum": LANGUAGES,
+        "QuestionKindEnum": "apps.assessments.models.Question.Kind",
+        "QuestionStatusEnum": "apps.assessments.models.Question.Status",
+        "ExamKindEnum": "apps.assessments.models.Exam.Kind",
+        "ExamStatusEnum": "apps.assessments.models.Exam.Status",
+        "AttemptStatusEnum": "apps.assessments.models.ExamAttempt.Status",
     },
 }
 
@@ -253,6 +259,7 @@ CELERY_TIMEZONE = TIME_ZONE
 # and the matching entry here). Unknown task names would only produce errors.
 CELERY_BEAT_SCHEDULE: dict[str, dict] = {
     "cms-publish-scheduled-pages": {"task": "apps.cms.tasks.publish_scheduled_pages", "schedule": 60.0},
+    "assessments-expire-attempts": {"task": "apps.assessments.tasks.expire_overdue_attempts", "schedule": 60.0},
 }
 
 # --- Payments. Credentials are only read from the environment.
