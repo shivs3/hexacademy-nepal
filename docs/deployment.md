@@ -20,6 +20,51 @@ A single VPS (2 vCPU / 4 GB RAM is enough to start) running Docker Compose, behi
    `docker compose run --rm backend python manage.py grant_role you@example.com --role super_admin`.
 7. Check `curl -fsS https://hexacademynepal.com/readyz/`.
 
+## Payments: activating Khalti, eSewa and bank transfer
+
+No production payment credentials are in this repository, and none have been tested yet. Until a gateway is configured it stays hidden from learners, and the settings page in `/admin/commerce/settings` can't switch it on.
+
+**Before you start:** get merchant accounts with Khalti and eSewa. Confirm eligibility, fees and settlement terms with each provider, and get their sandbox (test) credentials first.
+
+**Khalti (ePayment, docs.khalti.com):**
+
+1. Set `KHALTI_SECRET_KEY` to the **live secret key** from the Khalti merchant dashboard. The public key is not used.
+2. Set `KHALTI_BASE_URL=https://khalti.com/api/v2/`. The default is the sandbox, `https://dev.khalti.com/api/v2/`.
+3. Check the production base URL against Khalti's current documentation before launch.
+
+**eSewa (ePay v2, developer.esewa.com.np):**
+
+1. Set `ESEWA_PRODUCT_CODE` and `ESEWA_SECRET_KEY` to the merchant values eSewa issues.
+2. Set `ESEWA_FORM_URL` and `ESEWA_STATUS_URL` to the **production** URLs from eSewa's documentation. The defaults are the UAT (test) URLs.
+3. Never put the UAT secret published in eSewa's docs into a production `.env`.
+
+**Return URLs.** Both providers send the learner back to `https://<FRONTEND_URL>/checkout/complete/<reference>`, so `FRONTEND_URL` must be the public HTTPS origin. Neither provider sends webhooks for these products, so there is nothing to register on their side.
+
+**Turning gateways on.** Restart the backend and the worker. A finance manager then enables each configured gateway in `/admin/commerce/settings`. The page shows "configured" when the key is present and never shows the key itself.
+
+**Bank transfer.** This needs no credentials:
+
+1. In payment settings, enable it and enter the bank details: account name, number, bank and branch.
+2. Finance approves each transfer from the "Transfers to review" queue after checking it against the bank statement.
+
+**Background jobs (Celery beat).** These must run in production:
+
+| Job | Schedule | What it does |
+| --- | --- | --- |
+| `commerce-reconcile-payments` | every 5 min | Re-checks unsettled gateway payments for 24 hours |
+| `commerce-expire-orders` | every 5 min | Expires unpaid orders after the order time limit; orders with a transfer awaiting review are kept |
+
+**Sandbox.** `PAYMENTS_ENABLE_SANDBOX` and `PAYMENTS_SANDBOX_SECRET` are for development and CI only. `config/settings/prod.py` refuses to start if the sandbox is enabled.
+
+**Staging test before launch.** On staging, with the providers' test credentials:
+
+1. Pay once with each gateway.
+2. Cancel once with each gateway.
+3. Close the tab mid-payment and check the reconcile job settles the payment.
+4. Approve one bank transfer and reject another.
+5. Record a refund.
+6. Compare the revenue report with the merchant dashboards.
+
 ## TLS
 
 Recommended: Cloudflare SSL mode **Full (strict)** with a Cloudflare Origin Certificate installed in Nginx. Add a `listen 443 ssl` server block using the origin cert and key, mount them read-only, and redirect port 80 to 443. Until that's done, use "Flexible" mode only for a first smoke test, never for real traffic.
@@ -56,3 +101,4 @@ docker image prune -f
 - [ ] Postgres and Redis ports are not reachable from outside (`nmap` from another host)
 - [ ] A backup + restore round trip works on staging
 - [ ] The Celery worker and beat are running (`docker compose logs worker beat`)
+- [ ] The payment staging test above passes with each provider's test credentials, then live keys are swapped in

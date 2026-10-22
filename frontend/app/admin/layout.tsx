@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell, type NavItem, type NavSection } from "@/components/shell/app-shell";
 import { requireStaff } from "@/lib/auth";
-import { canOpenBank, canOpenCatalog, canOpenEnrollments, canOpenExams, hasAnyPerm, hasPerm } from "@/lib/permissions";
+import { canOpenBank, canOpenCatalog, canOpenEnrollments, canOpenExams, canOpenOrders, hasAnyPerm, hasPerm } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: { default: "Staff", template: "%s | Staff | Hexacademy Nepal" }, robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -26,6 +26,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (hasPerm(user, "assessments.manage_question_bank"))
     assessments.push({ href: "/admin/assessments/subjects", label: "Subjects & topics", icon: "categories" });
 
+  const commerce: NavItem[] = [];
+  if (canOpenOrders(user)) commerce.push({ href: "/admin/commerce/orders", label: "Orders", icon: "orders" });
+  if (hasPerm(user, "commerce.manage_coupons")) commerce.push({ href: "/admin/commerce/coupons", label: "Coupons", icon: "coupons" });
+  if (hasPerm(user, "commerce.view_revenue")) commerce.push({ href: "/admin/commerce/revenue", label: "Revenue", icon: "analytics" });
+  if (hasPerm(user, "commerce.manage_payment_settings"))
+    commerce.push({ href: "/admin/commerce/settings", label: "Payment settings", icon: "settings" });
+
   const website: NavItem[] = [];
   if (hasAnyPerm(user, ["cms.manage_pages", "cms.manage_blog", "cms.manage_media"]))
     website.push({ href: "/admin/cms", label: "Website overview", icon: "website", exact: true });
@@ -42,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { items: [{ href: "/admin", label: "Overview", icon: "dashboard", exact: true }] },
     ...(learning.length ? [{ title: "Learning", items: learning }] : []),
     ...(assessments.length ? [{ title: "Assessments", items: assessments }] : []),
+    ...(commerce.length ? [{ title: "Commerce", items: commerce }] : []),
     ...(website.length ? [{ title: "Website", items: website }] : []),
     ...(people.length ? [{ title: "People", items: people }] : []),
   ];

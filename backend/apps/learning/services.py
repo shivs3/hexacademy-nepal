@@ -115,6 +115,16 @@ def enroll_free(user, course: Course, *, request=None) -> tuple[Enrollment, bool
     return enrollment, created
 
 
+def enroll_purchase(user, course: Course) -> tuple[Enrollment | None, bool]:
+    """Called by commerce once a payment is verified (the caller audits it).
+    Returns (None, False) for a learner whose access was revoked: staff decide
+    whether to reinstate them rather than a payment doing it silently."""
+    existing = Enrollment.objects.filter(user=user, course=course).first()
+    if existing and existing.status == Enrollment.Status.REVOKED:
+        return None, False
+    return _create_or_reactivate(user, course, source=Enrollment.Source.PURCHASE)
+
+
 def grant(user, course: Course, *, actor, request=None) -> tuple[Enrollment, bool]:
     if course.status == Course.Status.DRAFT:
         raise DomainError("Publish the course before enrolling learners.")

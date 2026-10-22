@@ -31,10 +31,18 @@ describe("EnrollPanel", () => {
     expect(screen.getByRole("link", { name: "Sign in to enroll for free" })).toHaveAttribute("href", "/login?next=%2Fcourses%2Fintro-python");
   });
 
-  it("does not offer a free enroll button for paid courses", () => {
+  it("sends paid courses to checkout instead of the free enroll button", () => {
     render(<EnrollPanel {...base} isFree={false} />);
     expect(screen.queryByRole("button", { name: /enroll/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "info@example.com" })).toHaveAttribute("href", expect.stringContaining("mailto:info@example.com"));
+    expect(screen.getByRole("link", { name: "Buy now" })).toHaveAttribute("href", "/checkout?course=intro-python");
+  });
+
+  it("asks visitors to sign in before checkout and returns them there", () => {
+    render(<EnrollPanel {...base} isFree={false} signedIn={false} />);
+    expect(screen.getByRole("link", { name: "Sign in to buy" })).toHaveAttribute(
+      "href",
+      `/login?next=${encodeURIComponent("/checkout?course=intro-python")}`,
+    );
   });
 
   it("enrolls in a free course and opens the player", async () => {

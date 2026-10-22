@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   Tags,
+  TicketPercent,
   User,
   Users,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const icons = {
   bank: FileQuestionMark,
   certificates: Award,
   orders: CreditCard,
+  coupons: TicketPercent,
   profile: User,
   users: Users,
   pages: FileText,

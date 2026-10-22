@@ -10,8 +10,8 @@ Update this file at the end of every milestone. Only record what was actually ex
 | M2 | CMS and public website: pages + versions + scheduling, section builder, menus, site settings, blog, SEO/sitemap, media library | **Done** (catalog-backed sections move to M3) |
 | M3 | Catalog and LMS: courses → modules → lessons → resources, enrollment, progress, course player, instructor tools | **Done** (assignments move to M4/M6; paid enrollment waits for M5) |
 | M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | **Done** (assignments move to M6) |
-| M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | Next |
-| M6 | Live classes (Meet/Zoom provider abstraction) and certificates with public verification | Planned |
+| M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | **Done** (real gateways need merchant credentials; see below) |
+| M6 | Live classes (Meet/Zoom provider abstraction), assignments, and certificates with public verification | Next |
 | M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | Planned |
 
 ## M1 — Foundation (completed 2026-10-17)
@@ -49,7 +49,7 @@ Update this file at the end of every milestone. Only record what was actually ex
 
 - ~~The interim home page and auth-panel tagline are static text.~~ Done in M2: both come from the CMS.
 - `/courses` 404s until M3. `/terms` and `/privacy` are ordinary CMS pages, seeded and published by `seed_cms` with a visible demo notice until replaced.
-- The Khalti/eSewa default URLs in `config/settings/base.py` (`PAYMENTS`) were written from memory and **must be checked against the official documentation in M5** before any use.
+- ~~The Khalti/eSewa default URLs in `config/settings/base.py` were written from memory.~~ M5 checked them against the official developer docs. The sandbox URLs are the defaults, and the production URLs must still be confirmed with each provider when the merchant account is opened (`docs/deployment.md`).
 - The CSP header is deferred to M7.
 - Staff role permission sets are minimal until each domain app adds its permissions to `apps/accounts/roles.py`.
 
@@ -222,16 +222,87 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Assignments and submissions move to M6 with certificates.
 - Anti-cheating is limited to what `security.md` lists; there is no proctoring.
 
+## M5 — Commerce (completed 2026-10-22)
+
+### Built
+
+- `apps/commerce`:
+  - Models: `Order`, `OrderItem` (title and price snapshots), `Coupon`, `CouponRedemption`, `Payment`, `PaymentEvent`, `Refund` and `CommerceSettings`.
+  - Money is `Decimal(12,2)`. Constraints cover unique order numbers, payment references and provider references.
+- Pricing (`pricing.py`):
+  - Prices come from the database at order time, never from the browser.
+  - Coupons can be percentage (with an optional cap) or a fixed amount, with a minimum subtotal, start and end dates, total and per-user limits, and a course scope.
+  - A coupon is reserved under `select_for_update` inside the atomic `create_order`.
+- Provider abstraction (`providers/`):
+  - **Khalti** (KPG-2: initiate, then lookup) and **eSewa** (ePay v2: HMAC-SHA256 signed form, then the status API), both written from the official docs.
+  - **Bank transfer**: the learner reports the transfer and finance approves or rejects it.
+  - A development-only **sandbox** provider, refused in production settings.
+- Confirmation (ADR-027):
+  - A payment is confirmed only after the server asks the provider. Return-URL parameters are ignored.
+  - Amount, currency, order and provider reference are all checked.
+  - A mismatch or duplicate payment flags the order `needs_review` instead of guessing.
+  - Lock order is order, then payment. Finalization is idempotent, and `PaymentEvent` records each step.
+- After a verified payment:
+  - `purchase` enrollments are created through `apps/learning` services. They are never duplicated, and a revoked enrollment is not silently re-granted.
+  - A refund can optionally revoke access.
+- Background jobs (Celery beat, every 5 min):
+  - `commerce-reconcile-payments` re-asks providers about pending payments for 24 h.
+  - `commerce-expire-orders` expires unpaid orders after `order_ttl_minutes` (default 60) and releases their coupons. Bank transfers are held 14 days.
+- Webhook endpoint:
+  - Only the sandbox posts to it: HMAC over `timestamp.body`, ±300 s window, unique event id.
+  - Khalti and eSewa document no webhooks for these flows, so none were invented.
+- Refunds are recorded after finance pays the money back through the merchant portal or bank (ADR-031). They are audited and capped at the refundable amount.
+- Permissions:
+  - `commerce.view_orders`, `manage_orders`, `manage_refunds`, `manage_coupons`, `view_revenue` and `manage_payment_settings`.
+  - Finance Manager holds all six and Support holds `view_orders`. Neither gains exam or security access.
+- Reports:
+  - A revenue report (gross, refunds, net, by provider and by course) with a CSV/XLSX export (`common/spreadsheet.py`), limited to 366 days.
+  - A transfer-review queue.
+- Throttling: the `payment` scope allows 30/min.
+- Frontend:
+  - `/checkout` (method picker, coupon field, server-priced summary), `/checkout/complete/[ref]` (polls the server's verdict), `/checkout/sandbox/[ref]`.
+  - `/dashboard/orders` and `/dashboard/orders/[number]`: receipt with print, bank-transfer form, pay again, cancel.
+  - Admin `/admin/commerce/{orders,orders/[number],coupons,revenue,settings}`.
+  - The course enroll panel shows "Buy now" for paid courses.
+- Playwright spec `e2e/commerce.spec.ts`:
+  - The editor publishes a paid course. A new learner is refused the lesson.
+  - The learner buys through the sandbox gateway and then gets the lesson, the course player and a "Paid" order in history.
+
+### Verified (executed locally on 2026-10-22)
+
+- Backend: `pytest` reports **286 passed** (81 commerce). `ruff check` and `ruff format --check` are clean. `makemigrations --check` reports no changes. `spectacular --validate --fail-on-warn` passes.
+- Frontend: `tsc --noEmit` and `eslint` are clean. `vitest` reports **98 passed** (13 files). `next build` succeeds, and all commerce routes are listed.
+- Playwright against the dev servers (Django with `DJANGO_E2E_RELAXED_THROTTLES=true PAYMENTS_ENABLE_SANDBOX=true`): **12/12 passed** (auth, CMS, commerce, exams, learning; desktop and mobile Chromium).
+- Manual smoke test as super admin: every admin commerce API and page returned 200. E2E data was then deleted from the dev database.
+
+### Not verified
+
+- **Real Khalti and eSewa**: there are no merchant or sandbox credentials. The providers are unit-tested with mocked HTTP responses shaped like the official docs. `docs/deployment.md` lists the activation and staging test steps.
+- The Celery beat jobs have been tested by calling the tasks directly. Celery, Redis, Docker, Nginx and CI are still not run locally (see M1).
+
+### Known gaps / follow-ups
+
+- Refunds are not sent through provider refund APIs (ADR-031).
+- The checkout UI buys one course at a time. The API accepts up to 10 items, but there is no cart or bundle UI.
+- No tax invoice or VAT handling. The receipt is a printable order summary.
+- Production gateway URLs must be confirmed when merchant accounts are opened.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.
-2. Next up is **M5: commerce** (`apps/commerce`):
-   - Orders and order items that snapshot names and prices (Decimal), coupons and redemptions, payments and payment events, and refunds.
-   - A provider abstraction. Khalti and eSewa must follow their **official** documentation only: no invented endpoints, signatures or env vars. Where the docs can't be confirmed, ship the sandbox provider (`PAYMENTS["ENABLE_SANDBOX_PROVIDER"]` already exists in settings) and document the activation steps.
-   - Server-side verification of every callback, idempotent webhook processing, and `purchase` enrollments created only after verified payment (reuse `apps/learning` services).
-   - Manual bank-transfer verification (audited), order history, and reconciliation and revenue reports for finance managers. Finance must not gain exam or security access.
+2. Next up is **M6: live classes, assignments and certificates**:
+   - `apps/live_classes`:
+     - `Batch`, `BatchMembership`, `ClassSession` (one-time and recurring, timezone-aware, displayed in Asia/Kathmandu), `MeetingIntegration` and `AttendanceRecord`.
+     - A provider abstraction for Google Meet and Zoom. Start with instructor-managed meeting URLs. Use the provider APIs and OAuth only from the official docs, with credentials stored server-side.
+     - The join link is served only to eligible learners. Cancellation and rescheduling, Celery reminders, and attendance marked by instructors. Don't promise automatic attendance or recordings.
+   - Assignments and submissions (`apps/learning`): instructor review, grades and feedback, private files.
+   - `apps/certificates`:
+     - Templates, configurable eligibility checked on the server (lesson completion, optional exam pass), and a unique certificate number.
+     - A public verification page, revocation, and PDF download.
+     - Never issue a certificate because the browser says the course is complete.
+   - Student dashboard: upcoming classes and certificates. Instructor tools: batches, sessions, attendance.
 3. Local dev:
    - `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`.
    - E2E needs `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD` and `E2E_INSTRUCTOR_EMAIL`. The editor needs the `content_editor` and `exam_coordinator` roles.
-   - Start Django with `DJANGO_E2E_RELAXED_THROTTLES=true` for full E2E runs.
+   - Start Django with `DJANGO_E2E_RELAXED_THROTTLES=true` for full E2E runs. The commerce spec also needs `PAYMENTS_ENABLE_SANDBOX=true` and any `PAYMENTS_SANDBOX_SECRET` (`dev.py` enables the sandbox by default).
 4. Keep the verification bar: tests and builds must actually run before anything is marked done.

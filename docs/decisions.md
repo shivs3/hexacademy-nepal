@@ -138,3 +138,34 @@ Short records of choices that are expensive to reverse. Newest last.
 
 **Decision:** Exams are addressed by slug in learner URLs and APIs (`/dashboard/exams/{slug}`). Attempts use numeric ids, and the API answers 404 for any attempt that isn't the caller's. Leaderboards show each learner's best attempt by initials only, with the viewer's own row marked. Question and option images are public media assets, chosen in the bank editor.
 **Consequences:** Rankings don't reveal names or emails. Images are not secret, so don't put an answer in an image's file name or alt text. Exams with sensitive images should wait for private media delivery.
+
+## ADR-027: Payments are confirmed by asking the provider, not by callbacks
+
+**Decision:** An order is marked paid only after the server queries the provider's status API (Khalti `epayment/lookup/`, eSewa `transaction/status/`) and the reported amount matches. Return-URL parameters are never parsed. Neither provider documents webhooks for these products, so a beat job re-checks unsettled gateway payments every 5 minutes for 24 hours, covering learners who close the tab mid-redirect.
+**Consequences:** One trust path for every provider, and no unauthenticated endpoint can mark a payment paid. A payment may take up to 5 minutes to settle if the learner never returns. If a provider later adds signed webhooks, they become a trigger for the same verify call.
+
+## ADR-028: Money is Decimal(12, 2) NPR with snapshot order items
+
+**Decision:** Amounts are `Decimal` with two places (rupees and paisa). Order items copy title, slug, list price, unit price and discount at order time; database `CHECK`s keep `total = subtotal − discount` and refunds within the total. Providers that need paisa (Khalti) convert at the edge.
+**Consequences:** Later price edits or deleted courses never change an order. The frontend treats amounts as strings and compares them in integer paisa.
+
+## ADR-029: Bad payment situations flag the order instead of guessing
+
+**Decision:** An amount mismatch, a second successful payment for a paid order, or a payment for a course the learner was removed from does not fail silently or auto-refund. The payment gets a distinct status (`mismatch`, `duplicate`) and the order gets `needs_review` with a reason, shown in a finance queue until someone resolves it with a note.
+**Consequences:** Money problems always reach a person, with an audit trail. Finance must watch the "Flagged for review" queue.
+
+## ADR-030: Coupons are reserved at order time
+
+**Decision:** Placing an order creates a `CouponRedemption` in `reserved` state under a coupon row lock; payment turns it `redeemed`, cancellation or expiry `released`. Reserved and redeemed rows both count towards total and per-learner limits. Unpaid orders expire after `order_ttl_minutes` (default 60), except while a bank transfer awaits review (held up to 14 days).
+**Consequences:** Limited coupons can't be oversold by parallel checkouts. An abandoned checkout ties up a use for at most the order TTL.
+
+## ADR-031: Refunds are recorded, not executed
+
+**Decision:** The platform records refunds (amount, reason, provider or bank reference, optional access revocation) but does not call provider refund APIs. Finance issues the refund from the merchant portal or bank.
+**Consequences:** No refund API credentials or flows to secure in this release, and bank transfers are handled the same way. Reconciliation relies on staff entering the reference. A provider refund integration can be added behind the provider interface later.
+
+## ADR-032: A local sandbox gateway instead of shared test credentials
+
+**Decision:** Development, tests and CI use a built-in sandbox provider that simulates the redirect, the status check and a signed webhook. It is enabled only by `PAYMENTS_ENABLE_SANDBOX` and production settings refuse to start with it. Khalti and eSewa test credentials are configured per environment and never committed.
+**Consequences:** The whole purchase journey runs end to end without third-party accounts (the Playwright commerce test uses it). The real gateways still need a staging test with merchant test keys before launch (see `deployment.md`).
+

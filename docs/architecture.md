@@ -84,6 +84,16 @@ frontend/
 - An attempt copies everything it needs (content, key, marks) into `AttemptQuestion` rows at start. Grading and review read only those rows.
 - The learner player (`/exam/[attemptId]`) is a client component. It renders the server's attempt, queues answer saves one at a time (`use-answer-queue.ts`), and retries when offline. It submits on the server deadline. The result page is a server component.
 
+## Commerce (M5)
+
+- `apps/commerce` owns orders, payments, coupons and refunds.
+  - `pricing.py`: the only place amounts are computed (sale prices, coupon rules and limits, per-item discount split).
+  - `services.py`: the order and payment state machine (create, initiate, verify and apply, mark paid and enroll, cancel, expire, bank-transfer review, refunds, review flags). Lock order is always order, then payment.
+  - `providers/`: one `PaymentProvider` interface (`initiate`, `verify`, `is_configured`) with Khalti, eSewa and sandbox implementations, plus a small HTTP helper with timeouts. Adding a provider means one module and a registry entry.
+  - `sandbox.py`: the development gateway and its signed webhook. `reports.py`: revenue aggregation. `tasks.py`: the reconciliation and expiry beat jobs.
+- Enrollment stays in `apps/learning` (`enroll_purchase`); commerce calls it and never writes enrollments directly.
+- Frontend: `/checkout?course=` (quote, coupon, method), the provider redirect, `/checkout/complete/{reference}` (server verification with short polling), `/dashboard/orders` (history, receipts, bank-transfer form, pay again). Staff use `/admin/commerce/*`: orders (queues for transfers and flagged orders), coupons, revenue (chart and CSV) and payment settings.
+
 ## Roles
 
 | Role | Scope |
@@ -93,12 +103,12 @@ frontend/
 | Instructor | Own courses and lessons (M3); questions and exams for courses they teach, plus read access to the shared active bank (M4); live sessions (M6) |
 | Teaching assistant | Assigned courses: read-only course view and learner progress (M3); their courses' exams and results, never the bank (M4); attendance (M6) |
 | Exam coordinator | The whole question bank including answer keys, every exam and every result (M4) |
-| Finance manager | Orders, payments, refunds, coupons. No answer keys or security settings (M5) |
-| Support staff | User directory, activate/deactivate accounts, enrollments (grant, revoke, progress) |
+| Finance manager | Orders, payment verification, bank-transfer review, refunds, coupons, revenue reports, payment settings. No answer keys, CMS, users or security settings (M5) |
+| Support staff | User directory, activate/deactivate accounts, enrollments (grant, revoke, progress), read-only orders (M5) |
 | Student | Own learning, exams, orders, certificates |
 
 The UI hides what a user cannot use, but **every check is enforced again in the API**, including object-level checks (for example, an instructor may only edit their own courses).
 
 ## Background jobs
 
-Celery runs in a worker plus beat. Without `REDIS_URL` (local dev and tests) tasks run eagerly. Each app adds its periodic jobs to `CELERY_BEAT_SCHEDULE` when it lands, for example exam-attempt finalisation (M4, every minute), class reminders (M6) and scheduled page publishing (M2).
+Celery runs in a worker plus beat. Without `REDIS_URL` (local dev and tests) tasks run eagerly. Each app adds its periodic jobs to `CELERY_BEAT_SCHEDULE` when it lands, for example exam-attempt finalisation (M4, every minute), payment reconciliation and unpaid-order expiry (M5, every 5 minutes), class reminders (M6) and scheduled page publishing (M2).

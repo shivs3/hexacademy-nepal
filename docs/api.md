@@ -162,6 +162,43 @@ Learners see published and closed exams that are open to everyone, belong to a c
 | GET | `…/exams/{id}/attempts/`, `…/analytics/`, `…/results-export/` | Results, per-question difficulty and score spread, CSV export |
 | GET | `/admin/assessments/course-options/` | Courses the caller may attach an exam to |
 
+## Commerce (M5)
+
+### Learner
+
+Prices, discounts and totals are always computed by the server; the browser sends only course slugs, a coupon code and a provider key. Order and payment endpoints are scoped to the caller: another user's order number or payment reference answers 404. Throttle scope `payment` (30/min) on quote, order, initiate, verify and bank-transfer.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/payments/methods/` | Public. `{methods: [{key, label, kind: gateway\|manual, min_amount}], bank_transfer_instructions, sandbox}`. Only methods finance enabled **and** whose credentials are configured |
+| POST | `/orders/quote/` | `{courses: [slug], coupon_code?}`. Price breakdown without creating anything. Errors: `empty_order`, `too_many_items`, 404 `not_available`, `free_course`, `already_enrolled`, and `coupon_invalid`, `coupon_expired`, `coupon_not_applicable`, `coupon_min_subtotal`, `coupon_exhausted`, `coupon_user_limit`; 403 `revoked` for a learner removed from the course |
+| POST | `/orders/` | Same body. Creates a pending order (201) with item snapshots and reserves the coupon. A total of 0 (100 % coupon) is paid and enrolled immediately |
+| GET | `/me/orders/`, `/me/orders/{number}/` | Own orders (paginated) with items, payments and `can_pay` |
+| POST | `/me/orders/{number}/cancel/` | Pending orders only; 409 while a bank transfer is under review |
+| POST | `/payments/initiate/` | `{order, provider}`. Returns `{payment, action}` where `action.kind` is `redirect` (`url`), `form` (`url`, `fields` to POST, for eSewa) or `none` (bank transfer). 400 `method_unavailable`, 409 `order_closed`, 400 `amount_too_small`, 502 `provider_unavailable` |
+| POST | `/payments/{reference}/verify/` | Asks the provider for the real status and applies it (idempotent). Query parameters from the return redirect are never read. Returns `{payment, order}` |
+| POST | `/payments/{reference}/bank-transfer/` | `{payer_name, bank_reference, transferred_on, note?}`. Marks the transfer as submitted for finance review and holds the order open for 14 days |
+| GET/POST | `/payments/sandbox/{reference}/` | Development only (404 when disabled). GET shows the test charge; POST `{outcome: complete\|cancel}` |
+| POST | `/webhooks/payments/{provider}/` | Only `sandbox` is accepted (Khalti and eSewa ePay send no webhooks). HMAC `X-Sandbox-Signature` over `"<timestamp>.<body>"` with `X-Sandbox-Timestamp` (±300 s); each event id is processed once; the body only triggers a re-verify |
+
+### Staff
+
+| Method | Path | Permission |
+| --- | --- | --- |
+| GET | `/admin/commerce/orders/` | Any of view_orders, manage_orders, manage_refunds, view_revenue. `?status= ?provider= ?needs_review= ?awaiting_transfer_review= ?search=` (number, payment reference, provider transaction id, learner name or email) |
+| GET | `/admin/commerce/orders/{number}/` | Same. Includes payments with their event log, and refunds |
+| POST | `…/orders/{number}/cancel/` `{note}` | manage_orders. Pending orders only |
+| POST | `…/orders/{number}/resolve-review/` `{note}` | manage_orders. Clears the review flag; audited with the old reason |
+| POST | `…/orders/{number}/refund/` `{amount, reason, provider_reference?, revoke_access}` | manage_refunds. Records a refund paid out at the provider or bank; at most the refundable amount; optional revocation of purchase enrollments |
+| GET | `…/orders/export/?start=&end=` | view_revenue. CSV (formula-safe), at most 366 days, audited |
+| POST | `/admin/commerce/payments/{id}/recheck/` | manage_orders. Re-verifies a gateway payment |
+| POST | `…/payments/{id}/approve-transfer/` `{amount_received, note?}` | manage_orders. The amount must equal the payment; enrolls the learner |
+| POST | `…/payments/{id}/reject-transfer/` `{note}` | manage_orders. The note is shown to the learner |
+| GET/POST/PATCH/DELETE | `/admin/commerce/coupons/` | manage_coupons. `?search= ?active=`. The kind cannot change and a coupon cannot be deleted once used (deactivate it instead) |
+| GET | `/admin/commerce/course-options/` | manage_coupons. Non-archived courses for the coupon picker |
+| GET/PATCH | `/admin/commerce/settings/` | manage_payment_settings. Gateways can only be enabled when configured; responses show `configured` flags, never keys |
+| GET | `/admin/commerce/reports/revenue/?start=&end=&group=day\|month` | view_revenue. Gross, refunds, net, per period, per provider and per course (Nepal calendar days) |
+
 ## Operations
 
 | Path | Purpose |

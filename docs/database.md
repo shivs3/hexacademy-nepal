@@ -122,6 +122,35 @@ Marks are `Decimal(6, 2)`. Grading reads only the attempt's snapshot, so editing
 
 Custom permissions: `assessments.manage_question_bank`, `manage_exams`, `author_course_assessments`.
 
+## Commerce tables (M5)
+
+```
+User ──< Order ──< OrderItem ──► Course          order.user PROTECT; item.course SET_NULL (title, slug, prices are snapshots)
+Order ──< Payment ──< PaymentEvent              payment.order PROTECT; events CASCADE (append-only history)
+Order ──< Refund ──► Payment                    PROTECT
+Order ──► Coupon (SET_NULL) ; Order ──1 CouponRedemption ──► Coupon (PROTECT)
+Coupon >──< Course                              empty set = every paid course
+WebhookEvent ──► Payment (SET_NULL) ; SandboxCharge ──1 Payment (CASCADE, development only)
+PaymentSettings                                 singleton (id = 1)
+```
+
+| Table | Key columns and rules |
+| --- | --- |
+| `commerce_paymentsettings` | `khalti_enabled`, `esewa_enabled`, `bank_transfer_enabled`, `bank_transfer_instructions` (sanitised rich text), `order_ttl_minutes` (default 60). **No credentials**: gateway keys come only from the environment |
+| `commerce_coupon` | `code` unique (stored upper case, whitespace removed), `kind` percent/fixed, `value` (`CHECK` > 0, percent ≤ 100), `max_discount`, `min_subtotal` (`CHECK` ≥ 0), `starts_at` / `ends_at` (`CHECK` ends after starts), `max_redemptions`, `per_user_limit`, `is_active` |
+| `commerce_order` | `number` unique, `user`, `status` pending/paid/cancelled/expired/partially_refunded/refunded (indexed), `currency`, `subtotal`, `discount`, `total`, `refunded_amount`, `coupon_code` (snapshot), `expires_at`, `paid_at`, `cancelled_at`, `needs_review` (indexed), `review_reason`. `CHECK`s: subtotal ≥ 0; 0 ≤ discount ≤ subtotal; **total = subtotal − discount**; 0 ≤ refunded ≤ total; a paid or refunded order has `paid_at`. Indexes `(user, -created_at)`, `(status, paid_at)` |
+| `commerce_orderitem` | `title`, `course_slug`, `list_price`, `unit_price` (sale price when on sale), `discount` (its share of the coupon), `total`. Unique `(order, course)`; `CHECK` total = unit_price − discount, discount ≥ 0 |
+| `commerce_payment` | `provider` khalti/esewa/bank_transfer/sandbox, `status` initiated/pending/completed/failed/cancelled/expired/refunded/duplicate/mismatch (indexed), `amount`, `reference` unique (our id sent to the provider), `provider_reference` (Khalti `pidx`), `provider_transaction_id`, `provider_status`, `verified_at`, `last_checked_at`, plus bank-transfer fields (`payer_name`, `bank_reference`, `transferred_on`, `payer_note`, `submitted_at`, `reviewed_by`, `reviewed_at`, `review_note`). **Partial unique `(provider, provider_reference)`** where set; **partial unique `(order)` where completed** (an order is settled by at most one payment); `CHECK` amount ≥ 0. Index `(provider, status, created_at)` |
+| `commerce_paymentevent` | `kind`, `source` (learner/task/webhook/staff), `status_after`, `data` (sanitised provider response, never credentials), `created_at` (indexed) |
+| `commerce_refund` | `amount` (`CHECK` > 0), `reason`, `provider_reference`, `revoked_access`, `processed_by` (PROTECT) |
+| `commerce_couponredemption` | One per order. `status` reserved → redeemed (on payment) or released (on cancel/expiry). Reserved and redeemed rows count towards the limits. Indexes `(coupon, status)`, `(coupon, user, status)` |
+| `commerce_webhookevent` | Unique `(provider, event_id)`, so a replayed delivery is ignored. `payload`, `received_at`, `processed_at` |
+| `commerce_sandboxcharge` | The local test gateway's own state (`token` unique, `status`, `transaction_id`). Production refuses to start with the sandbox enabled |
+
+All money is `Decimal(12, 2)` in NPR; no floats anywhere, including the frontend (amounts travel as strings and are compared in paisa). Orders are never deleted: `PROTECT` on the user and on payments keeps the financial record even if a course disappears.
+
+Custom permissions: `commerce.view_orders`, `manage_orders`, `manage_refunds`, `manage_coupons`, `view_revenue`, `manage_payment_settings`.
+
 ## Backups
 
 See [deployment.md](deployment.md#backups). Use `pg_dump` custom format daily, keep copies off-host, and test restores.

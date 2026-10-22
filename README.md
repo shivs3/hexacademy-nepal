@@ -1,6 +1,6 @@
 # Hexacademy Nepal
 
-CMS + LMS + online examination platform for [hexacademynepal.com](https://hexacademynepal.com).
+CMS + LMS + online examination + course commerce platform for [hexacademynepal.com](https://hexacademynepal.com).
 
 | Part | Stack |
 | --- | --- |
@@ -59,6 +59,8 @@ also needs `E2E_INSTRUCTOR_EMAIL`, an account with the `instructor` role. The ex
 (`python manage.py grant_role <email> --role exam_coordinator`). The suite registers and signs in many accounts, so start
 the local Django server with `DJANGO_E2E_RELAXED_THROTTLES=true` (development settings only) or the real login and
 registration limits will throttle a full run.
+The commerce test buys a course through the built-in sandbox gateway, which development settings enable by default
+(`PAYMENTS_ENABLE_SANDBOX`); it skips itself when `/api/v1/payments/methods/` reports `sandbox: false`.
 
 Demo content, clearly labelled as such: `python manage.py seed_cms` (pages, menus, settings) and
 `python manage.py seed_catalog --instructor <email>` (two demo courses; without `--instructor` they stay drafts).

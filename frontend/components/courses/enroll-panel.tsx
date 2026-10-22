@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { api } from "@/lib/api/client";
 import { ApiError, errorMessage } from "@/lib/api/errors";
+import { checkoutHref } from "@/lib/commerce";
 
 type Props = {
   slug: string;
@@ -19,8 +20,8 @@ type Props = {
 
 /**
  * Enrollment call to action. Free courses enroll in one click; paid courses
- * explain how to buy until online payment is available (Milestone 5). The
- * backend decides: a paid course answers 402 even if this UI is bypassed.
+ * go to checkout. The backend decides: a paid course answers 402 to the free
+ * enroll endpoint even if this UI is bypassed, and checkout prices server-side.
  */
 export function EnrollPanel({ slug, isFree, signedIn, enrolled, contactEmail }: Props) {
   const router = useRouter();
@@ -37,25 +38,21 @@ export function EnrollPanel({ slug, isFree, signedIn, enrolled, contactEmail }: 
   }
 
   if (!isFree) {
+    const checkout = checkoutHref(slug);
     return (
       <div className="flex flex-col gap-3">
-        <Alert tone="info" title="Online payment is coming soon">
-          {contactEmail ? (
-            <>
-              To join this course now, email{" "}
-              <a href={`mailto:${contactEmail}?subject=${encodeURIComponent(`Enrollment: ${slug}`)}`} className="font-medium underline">
-                {contactEmail}
-              </a>{" "}
-              and our team will enroll you after confirming payment.
-            </>
-          ) : (
-            "Please contact our team to join this course."
-          )}
-        </Alert>
-        {!signedIn && (
-          <Button asChild variant="outline" className="w-full">
-            <Link href={`/register?next=${encodeURIComponent(`/courses/${slug}`)}`}>Create a free account first</Link>
-          </Button>
+        <Button asChild size="lg" className="w-full">
+          <Link href={signedIn ? checkout : `/login?next=${encodeURIComponent(checkout)}`}>
+            {signedIn ? "Buy now" : "Sign in to buy"}
+          </Link>
+        </Button>
+        {contactEmail && (
+          <p className="text-center text-xs text-muted">
+            Questions before you buy?{" "}
+            <a href={`mailto:${contactEmail}?subject=${encodeURIComponent(`Course: ${slug}`)}`} className="font-medium text-teal-700 underline">
+              {contactEmail}
+            </a>
+          </p>
         )}
       </div>
     );

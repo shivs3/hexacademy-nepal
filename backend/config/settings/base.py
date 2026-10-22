@@ -39,6 +39,7 @@ LOCAL_APPS = [
     "apps.catalog",
     "apps.learning",
     "apps.assessments",
+    "apps.commerce",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -209,6 +210,7 @@ REST_FRAMEWORK = {
         "email_verify": "10/hour",
         "exam_answer": "240/min",
         "newsletter": "10/hour",
+        "payment": "30/min",
     },
 }
 
@@ -230,6 +232,10 @@ SPECTACULAR_SETTINGS = {
         "ExamKindEnum": "apps.assessments.models.Exam.Kind",
         "ExamStatusEnum": "apps.assessments.models.Exam.Status",
         "AttemptStatusEnum": "apps.assessments.models.ExamAttempt.Status",
+        "OrderStatusEnum": "apps.commerce.models.Order.Status",
+        "PaymentStatusEnum": "apps.commerce.models.Payment.Status",
+        "PaymentProviderEnum": "apps.commerce.models.Payment.Provider",
+        "CouponKindEnum": "apps.commerce.models.Coupon.Kind",
     },
 }
 
@@ -260,6 +266,8 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE: dict[str, dict] = {
     "cms-publish-scheduled-pages": {"task": "apps.cms.tasks.publish_scheduled_pages", "schedule": 60.0},
     "assessments-expire-attempts": {"task": "apps.assessments.tasks.expire_overdue_attempts", "schedule": 60.0},
+    "commerce-reconcile-payments": {"task": "apps.commerce.tasks.reconcile_pending_payments", "schedule": 300.0},
+    "commerce-expire-orders": {"task": "apps.commerce.tasks.expire_stale_orders", "schedule": 300.0},
 }
 
 # --- Payments. Credentials are only read from the environment.

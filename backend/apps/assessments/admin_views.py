@@ -5,9 +5,6 @@ visible but read-only records are 403 on writes. Answer keys are only
 serialised here, behind policies.py.
 """
 
-import csv
-import io
-
 from django.db import IntegrityError
 from django.db.models import Count, ProtectedError, Q
 from django.http import HttpResponse
@@ -26,6 +23,7 @@ from apps.catalog.models import Course
 from common.exceptions import ConflictError
 from common.pagination import StandardPagination
 from common.permissions import HasPerm
+from common.spreadsheet import csv_text
 
 from . import importer, policies, results, services
 from .admin_serializers import (
@@ -342,23 +340,31 @@ class ExamViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="results-export")
     def results_export(self, request, pk=None):
         exam = self.get_object()
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(["learner", "email", "attempt", "status", "started_at", "ended_at", "score", "max_score",
-                         "correct", "incorrect", "unanswered", "passed", "time_spent_seconds"])  # fmt: skip
-        for a in (
-            exam.attempts.select_related("user")
+        header = ["learner", "email", "attempt", "status", "started_at", "ended_at", "score", "max_score",
+                  "correct", "incorrect", "unanswered", "passed", "time_spent_seconds"]  # fmt: skip
+        rows = (
+            [
+                a.user.full_name,
+                a.user.email,
+                a.number,
+                a.status,
+                a.started_at.isoformat(),
+                a.ended_at.isoformat() if a.ended_at else "",
+                a.score,
+                a.max_score,
+                a.correct_count,
+                a.incorrect_count,
+                a.unanswered_count,
+                "" if a.passed is None else ("yes" if a.passed else "no"),
+                results.time_spent_seconds(a),
+            ]  # fmt: skip
+            for a in exam.attempts.select_related("user")
             .exclude(status=ExamAttempt.Status.IN_PROGRESS)
             .order_by("user__email", "number")
-        ):
-            writer.writerow([
-                a.user.full_name, a.user.email, a.number, a.status, a.started_at.isoformat(),
-                a.ended_at.isoformat() if a.ended_at else "", a.score, a.max_score, a.correct_count,
-                a.incorrect_count, a.unanswered_count, "" if a.passed is None else ("yes" if a.passed else "no"),
-                results.time_spent_seconds(a),
-            ])  # fmt: skip
+        )
+        body = csv_text(header, rows)
         audit.record("assessments.results_exported", actor=request.user, target=exam, request=request)
-        response = HttpResponse(buffer.getvalue(), content_type="text/csv; charset=utf-8")
+        response = HttpResponse(body, content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{exam.slug}-results.csv"'
         return response
 

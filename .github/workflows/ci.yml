@@ -84,6 +84,8 @@ jobs:
       DATABASE_URL: postgres://ci:ci@localhost:5432/hexacademy_e2e
       DJANGO_SETTINGS_MODULE: config.settings.dev
       DJANGO_E2E_RELAXED_THROTTLES: "true"
+      PAYMENTS_ENABLE_SANDBOX: "true"
+      PAYMENTS_SANDBOX_SECRET: ci-only-sandbox-secret
       # Throwaway account in the disposable CI database only.
       E2E_EDITOR_EMAIL: e2e-editor@example.com
       E2E_EDITOR_PASSWORD: ci-only-E2E-editor-91

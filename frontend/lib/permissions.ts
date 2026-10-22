@@ -42,3 +42,8 @@ export function canOpenExams(user: Pick<CurrentUser, "permissions" | "is_superus
   if (!user) return false;
   return canOpenBank(user) || user.roles.includes("teaching_assistant");
 }
+
+/** Orders: finance staff and support staff (support can look orders up but not act on them). */
+export function canOpenOrders(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
+  return hasAnyPerm(user, ["commerce.view_orders", "commerce.manage_orders", "commerce.manage_refunds", "commerce.view_revenue"]);
+}
