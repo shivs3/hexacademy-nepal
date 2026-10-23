@@ -199,6 +199,80 @@ Prices, discounts and totals are always computed by the server; the browser send
 | GET/PATCH | `/admin/commerce/settings/` | manage_payment_settings. Gateways can only be enabled when configured; responses show `configured` flags, never keys |
 | GET | `/admin/commerce/reports/revenue/?start=&end=&group=day\|month` | view_revenue. Gross, refunds, net, per period, per provider and per course (Nepal calendar days) |
 
+## Live classes (M6)
+
+### Learner
+
+Session lists and details never include the meeting link or passcode; only `POST …/join/` returns them, after the server checks membership, the active enrollment, the status and the join window. Times are ISO 8601 in UTC; clients show Nepal time.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me/class-sessions/` | Sessions of the caller's batches (active enrollments only), paginated. `?scope=upcoming` (default) or `past`, `?course=` |
+| GET | `/class-sessions/{id}/` | One session with `state`, `join_opens_at`, the caller's `attendance` and `joined_at`, and `recording_url` and `notes` when staff add them. 404 for non-members |
+| POST | `/class-sessions/{id}/join/` | `{provider, join_url, passcode}`. 403 `not_member`; 409 `cancelled`, `not_open_yet` (15 minutes before start), `ended`. The first join is stored as `joined_at` on the attendance row |
+
+### Staff
+
+Permission: `manage_all_classes`, or `teach_assigned_classes` on a course where the caller is on the teaching team (instructors change things; teaching assistants read and mark attendance). Support staff with `view_all_classes` can read batches and sessions; meeting details are omitted for them.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/admin/live-classes/courses/` | Courses the caller can schedule for |
+| GET/POST/PATCH/DELETE | `/admin/live-classes/batches/` | `?course= ?status= ?search=`. Deleting a batch with sessions answers 409 `has_sessions` (archive it instead) |
+| GET/POST | `…/batches/{id}/members/` | List (`?search=`); add `{emails: [...]}` or `{all_enrolled: true}` (at most 200 per request). Returns `{added, already_members, not_enrolled, unknown}`: only actively enrolled learners are added. 409 `batch_full`, `batch_archived` |
+| DELETE | `…/batches/{id}/members/{membership_id}/` | Remove a member |
+| GET | `…/batches/{id}/team/` | Teaching team, for the instructor picker |
+| GET/POST | `/admin/live-classes/sessions/` | `?batch= ?course= ?status= ?scope=upcoming\|past`. Create `{batch, title, description?, starts_at, ends_at, instructor (teaching team member or null), provider, join_url, passcode?, repeat_weeks (1 to 26)}`. The link must be a Google Meet or Zoom link matching `provider` |
+| PATCH | `…/sessions/{id}/` | Reschedule or edit, including `recording_url` and `notes` after the class; a time change notifies members, and so does a new recording. 409 `cancelled` |
+| POST | `…/sessions/{id}/cancel/` | `{reason?}`. Notifies members |
+| GET/PUT | `…/sessions/{id}/attendance/` | Roster with `joined_at`; PUT `{entries: [{user, status (present/late/absent/excused or blank), note?}]}`, at most 500 |
+| GET | `…/sessions/{id}/attendance-summary/` | Counts by status |
+
+## Assignments (M6)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me/assignments/` | Published assignments of the caller's active courses, with their own submission, `can_submit` and `closed_reason`. `?course=<slug> ?status=todo\|submitted\|graded` |
+| GET | `/assignments/{id}/` | One assignment. 404 unless enrolled |
+| POST | `/assignments/{id}/submission/` | Multipart or JSON `{text?, file?, remove_file?}`. Creates or replaces the caller's submission. 409 `graded` (once graded, unless returned), `closed` (past due with late work off); 403 `not_enrolled`. Text up to 20,000 characters; files follow the resource upload rules |
+| GET | `/assignments/{id}/submission/file/` | The caller's own file (attachment, private) |
+| GET | `/admin/learning/assignment-courses/` | Courses the caller can author assignments for |
+| GET/POST/PUT/PATCH/DELETE | `/admin/learning/assignments/` | Authoring: catalog managers and the course's instructors. `?course= ?search= ?needs_grading=true`. Deleting one with submissions answers 409 `has_submissions` |
+| GET | `…/assignments/{id}/submissions/` | `?status= ?search=`. The course's teaching team or `grade_all_submissions`; content editors cannot read submissions |
+| GET | `/admin/learning/submissions/{id}/`, `…/{id}/file/` | Same permission |
+| POST | `…/submissions/{id}/grade/` | `{outcome: graded\|returned, points (required to grade, at most max_points), feedback (required to return)}`. Staff can regrade. Notifies the learner and triggers a certificate check |
+
+## Notifications (M6)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me/notifications/` | Own notifications, newest first, paginated. `?unread=true` |
+| GET | `/me/notifications/unread-count/` | `{unread}` |
+| POST | `/me/notifications/read/` | `{ids?: [id]}` (up to 100); without ids, marks all read. `{updated}` |
+
+## Certificates (M6)
+
+### Learner and public
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me/certificates/` | Own certificates with `verify_url` |
+| GET | `/me/certificates/progress/` | Courses with an enabled rule that the caller is enrolled in and has no certificate for, with each requirement and whether it is met |
+| GET/POST | `/me/courses/{slug}/certificate/` | Eligibility for one course; POST asks the server to issue if every requirement is met (201 when issued, 200 otherwise). 404 unless the caller is or was enrolled |
+| GET | `/me/certificates/{number}/pdf/` | Own certificate as a PDF (`Cache-Control: private, no-store`). 404 for anyone else's |
+| GET | `/certificates/verify/{number}/` | Public, no session. `{number, heading, recipient_name, course_title, issued_at, status, revoked_at}` only. Case-insensitive. Throttle `certificate_verify` (60/min) |
+
+### Staff
+
+| Method | Path | Permission |
+| --- | --- | --- |
+| GET/POST/PATCH/DELETE | `/admin/certificates/templates/` | manage_certificates. Deleting a template in use answers 409 `template_in_use` |
+| GET/POST/PATCH/DELETE | `/admin/certificates/rules/` | manage_certificates. One per course; the exam must belong to the course and have a pass mark; an enabled rule needs at least one requirement |
+| POST | `…/rules/{id}/issue-eligible/` | manage_certificates. Checks every active learner; `{issued}`. 409 `rule_disabled` |
+| GET | `/admin/certificates/courses/` | manage_certificates. Courses with their exams and `has_rule`, for the rule form |
+| GET | `/admin/certificates/issued/`, `…/{id}/`, `…/{id}/pdf/` | view_certificates or manage_certificates. `?course= ?status= ?search=` |
+| POST | `…/issued/{id}/revoke/` `{reason}`, `…/issued/{id}/reinstate/` | manage_certificates. 409 `already_revoked` / `not_revoked`; audited |
+
 ## Operations
 
 | Path | Purpose |

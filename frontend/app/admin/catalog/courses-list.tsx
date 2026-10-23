@@ -105,7 +105,7 @@ export function CoursesList({ canCreate, canManage }: { canCreate: boolean; canM
         />
       ) : data ? (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[48rem] text-left text-sm">
               <thead className={theadClass}>
                 <tr>

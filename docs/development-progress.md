@@ -11,8 +11,8 @@ Update this file at the end of every milestone. Only record what was actually ex
 | M3 | Catalog and LMS: courses → modules → lessons → resources, enrollment, progress, course player, instructor tools | **Done** (assignments move to M4/M6; paid enrollment waits for M5) |
 | M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | **Done** (assignments move to M6) |
 | M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | **Done** (real gateways need merchant credentials; see below) |
-| M6 | Live classes (Meet/Zoom provider abstraction), assignments, and certificates with public verification | Next |
-| M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | Planned |
+| M6 | Live classes (Meet/Zoom provider abstraction), assignments, and certificates with public verification | **Done** (Meet/Zoom APIs need OAuth credentials; links are instructor-managed) |
+| M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | Next |
 
 ## M1 — Foundation (completed 2026-10-17)
 
@@ -287,22 +287,66 @@ Update this file at the end of every milestone. Only record what was actually ex
 - No tax invoice or VAT handling. The receipt is a printable order summary.
 - Production gateway URLs must be confirmed when merchant accounts are opened.
 
+## M6 — Live classes, assignments and certificates (completed 2026-10-23)
+
+### Built
+
+- `apps/live_classes`:
+  - Models: `Batch`, `BatchMembership`, `ClassSession` and `AttendanceRecord`. Timestamps are stored in UTC and shown in Asia/Kathmandu (ADR-036).
+  - One-time sessions, plus weekly repeats (`repeat_weeks` 1–26). Cancel and reschedule notify members.
+  - Provider interface (`providers.py`) for Google Meet, Zoom and other links. Links are instructor-managed (ADR-033); there is no `MeetingIntegration` model until OAuth is implemented.
+  - The join link is a POST that only works for batch members, from 15 minutes before the start until the end (ADR-034). Joins are logged as evidence. Staff mark attendance; nothing claims automatic attendance or recordings (ADR-035).
+  - Celery beat `live-classes-send-reminders` (every 5 min) sends one reminder 60 minutes ahead.
+  - Roles: instructors and TAs teach assigned classes, support views every class, and only super admins manage every class (ADR-037).
+- Assignments (`apps/learning`):
+  - `Assignment` and `Submission`, with one submission per learner (ADR-038) and private file uploads.
+  - Grading (`graded` / `returned`; returning needs feedback), with notifications.
+  - Editors author assignments but can't read submissions (ADR-039).
+- `apps/notifications`: in-app notifications with an unread count and mark-read, plus an optional email copy that never contains meeting links (ADR-043).
+- `apps/certificates`:
+  - `CertificateTemplate`, `CertificateRule` (lessons, an optional exam pass, optional graded assignments) and `Certificate` with a unique `HXN-YYYY-XXXXXXXX` number.
+  - Issued only by the server, from server records, idempotently (ADR-040). Triggers: lesson completion, exam finalisation, result publication, grading, the learner's claim and a staff bulk check.
+  - Public verification (throttled; shows only what the printed certificate shows), revocation and reinstatement (audited; ADR-041), and a reportlab PDF rendered on demand (ADR-042).
+- Frontend:
+  - `/dashboard/classes`, `/dashboard/assignments`, `/dashboard/certificates`, `/dashboard/notifications`; the dashboard home shows upcoming classes and certificates.
+  - Admin `/admin/live-classes/...` (batches, members, sessions, attendance), assignment authoring and review, `/admin/certificates/{templates,rules,issued}`.
+  - Public `/certificates/verify` and `/certificates/verify/[number]`.
+  - Fixes: dialog header and footer no longer scroll away (`shrink-0`, scrolling body), and table scroll wrappers are `relative` so `sr-only` header text can't widen mobile pages.
+- Playwright specs `e2e/live-classes.spec.ts` and `e2e/certificates.spec.ts` (publish, rule, learner completion, PDF, public verify, revoke, and no horizontal overflow on mobile).
+
+### Verified (executed locally on 2026-10-23)
+
+- Backend: `pytest` reports **381 passed** (61 live classes, 16 assignments, 11 certificates, 7 notifications). `ruff check` and `ruff format --check` are clean. `makemigrations --check` reports no changes. `spectacular --validate --fail-on-warn` passes.
+- Frontend: `tsc --noEmit` and `eslint` (including `e2e/`) are clean. `vitest` reports **125 passed** (22 files). `next build` succeeds.
+- Playwright against the dev servers: **16/16 passed** (auth, CMS, commerce, exams, learning, live classes, certificates; desktop and mobile Chromium). E2E data was then deleted from the dev database.
+
+### Not verified
+
+- **Google Meet and Zoom APIs**: no OAuth apps or credentials. Links are pasted by instructors; `docs/deployment.md` lists what API work would need.
+- **Real email**: the console backend was used. SMTP, SPF/DKIM/DMARC are untested.
+- The reminder task has been tested by calling it directly. Celery beat, Redis, Docker, Nginx and CI are still not run locally (see M1).
+- Certificate PDFs use built-in Helvetica/Times, which can't draw Devanagari names (see `docs/deployment.md`).
+
+### Known gaps / follow-ups
+
+- No automatic meeting creation, attendance import or recording retrieval.
+- Template edits change certificates already issued, because PDFs are rendered on demand (ADR-042).
+- Notifications have no per-user email preferences yet.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.
-2. Next up is **M6: live classes, assignments and certificates**:
-   - `apps/live_classes`:
-     - `Batch`, `BatchMembership`, `ClassSession` (one-time and recurring, timezone-aware, displayed in Asia/Kathmandu), `MeetingIntegration` and `AttendanceRecord`.
-     - A provider abstraction for Google Meet and Zoom. Start with instructor-managed meeting URLs. Use the provider APIs and OAuth only from the official docs, with credentials stored server-side.
-     - The join link is served only to eligible learners. Cancellation and rescheduling, Celery reminders, and attendance marked by instructors. Don't promise automatic attendance or recordings.
-   - Assignments and submissions (`apps/learning`): instructor review, grades and feedback, private files.
-   - `apps/certificates`:
-     - Templates, configurable eligibility checked on the server (lesson completion, optional exam pass), and a unique certificate number.
-     - A public verification page, revocation, and PDF download.
-     - Never issue a certificate because the browser says the course is complete.
-   - Student dashboard: upcoming classes and certificates. Instructor tools: batches, sessions, attendance.
+2. Next up is **M7: production readiness**:
+   - Security: a Content-Security-Policy (Next.js and Django), a permission audit of every admin endpoint, `manage.py check --deploy` under production settings, and dependency scanning (`pip-audit`, `npm audit`).
+   - Observability: structured JSON logging, request IDs, error reporting hooks, and the health endpoints wired into monitoring.
+   - Performance: query counts on list endpoints (`assertNumQueries`), indexes for the hot filters, caching for public CMS and catalog reads.
+   - Accessibility: an axe pass in Playwright on the main public, dashboard and admin pages.
+   - CI: make `.github/workflows` run everything in this file's verification lists, including migrations and the production build.
+   - Backups: run `infrastructure/scripts` backup and restore against a scratch database and record the result.
+   - Launch-readiness review in `docs/deployment.md`.
 3. Local dev:
    - `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`.
-   - E2E needs `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD` and `E2E_INSTRUCTOR_EMAIL`. The editor needs the `content_editor` and `exam_coordinator` roles.
+   - E2E needs `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD`, `E2E_INSTRUCTOR_EMAIL` and `E2E_INSTRUCTOR_PASSWORD`. The editor needs the `content_editor` and `exam_coordinator` roles; the instructor needs `instructor`.
    - Start Django with `DJANGO_E2E_RELAXED_THROTTLES=true` for full E2E runs. The commerce spec also needs `PAYMENTS_ENABLE_SANDBOX=true` and any `PAYMENTS_SANDBOX_SECRET` (`dev.py` enables the sandbox by default).
+   - E2E specs create `e2e-` courses and learners in the dev database; delete them afterwards (Refund and Payment rows first, since they PROTECT orders).
 4. Keep the verification bar: tests and builds must actually run before anything is marked done.

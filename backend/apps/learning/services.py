@@ -176,6 +176,10 @@ def record_progress(enrollment: Enrollment, lesson: Lesson, *, completed: bool |
             enrollment.completed_at = now
             fields.append("completed_at")
     enrollment.save(update_fields=fields)
+    if "completed_at" in fields:
+        from apps.certificates.services import check_after_commit
+
+        check_after_commit(enrollment.user_id, enrollment.course_id)
     return progress
 
 

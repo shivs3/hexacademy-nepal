@@ -66,7 +66,7 @@ export function SubscriberList() {
         />
       ) : data ? (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[36rem] text-left text-sm">
               <thead className={theadClass}>
                 <tr>

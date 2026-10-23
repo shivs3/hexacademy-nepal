@@ -169,3 +169,59 @@ Short records of choices that are expensive to reverse. Newest last.
 **Decision:** Development, tests and CI use a built-in sandbox provider that simulates the redirect, the status check and a signed webhook. It is enabled only by `PAYMENTS_ENABLE_SANDBOX` and production settings refuse to start with it. Khalti and eSewa test credentials are configured per environment and never committed.
 **Consequences:** The whole purchase journey runs end to end without third-party accounts (the Playwright commerce test uses it). The real gateways still need a staging test with merchant test keys before launch (see `deployment.md`).
 
+
+## ADR-033: Instructor-managed meeting links behind a provider interface
+
+**Context:** Meet and Zoom API integrations need OAuth apps, paid plans and credentials that are not available yet, and building our own video is out of scope.
+**Decision:** A session stores the provider, the join link the instructor created in their own account, the meeting id parsed from it, and an optional passcode. Each provider (`apps/live_classes/providers.py`) validates and normalises its links and refuses host/start links. There is no `MeetingIntegration` model yet: it will hold OAuth tokens once a provider gains `create_meeting`.
+**Consequences:** Works today with any Meet or Zoom account and needs no secrets. Instructors have to create meetings by hand, and there is no automatic attendance or recording import (`deployment.md`, "Live classes").
+
+## ADR-034: The meeting link is released by a POST, inside a join window
+
+**Decision:** Lists and details never include the link. `POST /class-sessions/{id}/join/` checks membership, the active enrollment, the status and the time (from 15 minutes before the start until the end) and only then returns the link and passcode, recording the first join.
+**Consequences:** Links do not leak through calendars, caches or old pages, and removing a learner or revoking an enrollment stops access at once. A learner who copies the link can still share it; that is a limit of instructor-managed links.
+
+## ADR-035: Staff mark attendance; joins are evidence only
+
+**Decision:** `AttendanceRecord.status` (present, late, absent, excused) is set by the instructor or teaching assistant. `joined_at` only shows that the learner pressed Join here and is shown on the roster to help.
+**Consequences:** No false claims of automatic attendance. Staff do a small amount of manual work per class.
+
+## ADR-036: UTC in the database, Nepal time everywhere it is shown
+
+**Decision:** Timestamps are timezone-aware and stored in UTC. The backend formats with `Asia/Kathmandu`, and weekly repeats are computed on the Nepal wall clock. The browser converts form input with the fixed `+05:45` offset and formats with `Intl` in `Asia/Kathmandu`, regardless of the viewer's own time zone.
+**Consequences:** A class at 18:30 stays at 18:30 Nepal time for every week of a series and for viewers abroad. Nepal has no daylight saving, so the fixed offset is safe; it would need revisiting only if that changed.
+
+## ADR-037: Live-class roles
+
+**Decision:** Instructors on a course's teaching team create batches, manage members, schedule, reschedule and cancel. Teaching assistants on the team view their classes and mark attendance. Support staff (`view_all_classes`) see every schedule but never links. `manage_all_classes` is held by super administrators only by default. Reminders go out once per session, 60 minutes before the start.
+**Consequences:** Rescheduling stays with the people accountable for the class; support can answer "when is my class?" without being able to join it.
+
+## ADR-038: One submission per learner per assignment
+
+**Decision:** A unique `(assignment, user)` submission is replaced on resubmission (its `attempt` counter increases) until it is graded. Staff can return it with feedback, which reopens it. After the due time a submission is accepted and marked late only when `allow_late` is on. Text is plain text; files use private storage.
+**Consequences:** Simple to grade and reason about, and certificate rules can ask "is every assignment graded?". Earlier versions of a resubmitted answer are not kept.
+
+## ADR-039: Editors author assignments but cannot read learner work
+
+**Decision:** Assignment authoring follows course content editing (catalog managers and the course's instructors). Reading and grading submissions is for the course's teaching team, plus `grade_all_submissions`, which no role holds by default. A submission `PROTECT`s its assignment; an assignment with learner work is unpublished, not deleted.
+**Consequences:** Learners' work is seen by the people who teach them, not by everyone who edits the catalog. Grades and files cannot disappear because an assignment was deleted.
+
+## ADR-040: Certificates are issued by the server from stored records
+
+**Decision:** Each course has at most one rule (template, plus any of: complete every lesson, pass a chosen exam with released results, have every assignment graded). `issue_if_eligible` evaluates only database records, under a lock on the enrollment, and the unique `(user, course)` constraint guarantees one certificate. Checks are triggered after commit by lesson completion, exam finalisation, result publication and grading. The learner's claim button and the staff "issue to eligible learners" action call the same function.
+**Consequences:** No browser claim can produce a certificate, and repeated or concurrent triggers are harmless. A rule added later does not issue on its own: staff run the bulk action, or learners claim.
+
+## ADR-041: Revocation is permanent unless staff reinstate
+
+**Decision:** Revoking needs a reason (kept in the audit log) and marks the certificate revoked; the verify page and PDF say so. Automatic checks never re-issue a certificate for that learner and course, because the row still exists. Reinstating is a separate, audited staff action.
+**Consequences:** A revoked certificate cannot come back by accident when the learner completes another lesson. One learner holds at most one certificate per course, revoked or not.
+
+## ADR-042: PDFs are rendered on demand; templates stay live
+
+**Decision:** The PDF is drawn with reportlab on each download from the certificate's snapshots (recipient name, course title, number, date) and its template. Nothing is stored. The template is a foreign key, not a snapshot.
+**Consequences:** No file storage or regeneration jobs, and a revoked watermark appears at once. Editing a template's wording or signatory changes the PDFs of certificates already issued with it; create a new template when the wording must change only for future certificates. Built-in fonts do not cover Devanagari (`deployment.md`, "Certificates").
+
+## ADR-043: Notifications are in-app first; email is a copy
+
+**Decision:** `apps/notifications` stores one row per user and event. Email is sent only to verified, active accounts, after the transaction commits, via Celery. Links must be internal paths. Emails never include meeting links or passcodes; learners join from the site.
+**Consequences:** Email failures never break the action that caused them, and nothing private travels by email. There are no per-user email preferences yet.

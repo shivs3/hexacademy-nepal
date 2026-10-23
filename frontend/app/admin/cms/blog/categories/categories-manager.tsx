@@ -62,7 +62,7 @@ export function CategoriesManager() {
         <EmptyState icon={Tags} title="No categories yet" description="Create categories such as “Programming” or “Exam preparation” to organise posts." />
       ) : data ? (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead className={theadClass}>
                 <tr>

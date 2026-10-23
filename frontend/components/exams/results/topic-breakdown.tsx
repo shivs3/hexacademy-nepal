@@ -31,7 +31,7 @@ export function TopicBreakdown({ topics }: { topics: TopicRow[] }) {
           </div>
         </CardBody>
       )}
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
           <thead className={theadClass}>
             <tr>

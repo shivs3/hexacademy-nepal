@@ -274,6 +274,9 @@ def publish_results(user, exam: Exam, *, request=None) -> Exam:
         exam.results_published_at = timezone.now()
         exam.save(update_fields=["results_published_at", "updated_at"])
         audit.record("assessments.results_published", actor=user, target=exam, request=request)
+        from apps.certificates.services import on_results_published
+
+        on_results_published(exam)
     return exam
 
 

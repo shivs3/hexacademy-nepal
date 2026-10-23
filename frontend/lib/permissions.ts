@@ -47,3 +47,19 @@ export function canOpenExams(user: Pick<CurrentUser, "permissions" | "is_superus
 export function canOpenOrders(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
   return hasAnyPerm(user, ["commerce.view_orders", "commerce.manage_orders", "commerce.manage_refunds", "commerce.view_revenue"]);
 }
+
+/** Live classes: managers, support staff (read-only, never links) and teaching staff for their courses. */
+export function canOpenLiveClasses(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
+  return hasAnyPerm(user, ["live_classes.manage_all_classes", "live_classes.view_all_classes", "live_classes.teach_assigned_classes"]);
+}
+
+/** Assignments: course authors and managers write them; the teaching team reviews submissions. */
+export function canOpenAssignments(user: Pick<CurrentUser, "permissions" | "is_superuser" | "roles"> | null): boolean {
+  if (!user) return false;
+  return canOpenCatalog(user) || hasPerm(user, "learning.grade_all_submissions");
+}
+
+/** Certificates: managers (templates, rules, revocation) and support staff (read-only list). */
+export function canOpenCertificates(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
+  return hasAnyPerm(user, ["certificates.manage_certificates", "certificates.view_certificates"]);
+}

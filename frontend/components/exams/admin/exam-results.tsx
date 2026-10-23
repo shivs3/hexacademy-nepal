@@ -170,7 +170,7 @@ function AttemptsTable({ exam }: { exam: AdminExam }) {
         <EmptyState icon={Users} title={q || status ? "No attempts match" : "Nobody has taken this exam yet"} />
       ) : data ? (
         <>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[48rem] text-left text-sm">
               <thead className={theadClass}>
                 <tr>

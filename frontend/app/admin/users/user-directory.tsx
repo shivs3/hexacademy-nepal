@@ -146,7 +146,7 @@ export function UserDirectory({
         <EmptyState icon={Users} title="No users match these filters" />
       ) : data ? (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[44rem] text-left text-sm">
               <thead className="border-b border-line bg-page text-xs uppercase tracking-wide text-muted">
                 <tr>

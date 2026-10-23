@@ -61,6 +61,8 @@ the local Django server with `DJANGO_E2E_RELAXED_THROTTLES=true` (development se
 registration limits will throttle a full run.
 The commerce test buys a course through the built-in sandbox gateway, which development settings enable by default
 (`PAYMENTS_ENABLE_SANDBOX`); it skips itself when `/api/v1/payments/methods/` reports `sandbox: false`.
+The live-classes test signs in as the instructor too, so it also needs `E2E_INSTRUCTOR_PASSWORD`. The certificates test
+uses the editor (who needs the `content_editor` role, which can manage certificates) and the instructor email.
 
 Demo content, clearly labelled as such: `python manage.py seed_cms` (pages, menus, settings) and
 `python manage.py seed_catalog --instructor <email>` (two demo courses; without `--instructor` they stay drafts).

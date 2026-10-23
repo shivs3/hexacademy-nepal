@@ -142,9 +142,13 @@ def delete_resource(resource: LessonResource, *, actor, request=None):
         transaction.on_commit(lambda: storage.delete(name))
 
 
-def file_response(resource: LessonResource):
-    """Deliver a file the caller has already been authorised to read."""
-    disposition_name = resource.original_name or f"resource-{resource.pk}"
+def file_response(resource):
+    """Deliver a file the caller has already been authorised to read.
+
+    `resource` is any row with `file`, `original_name` and `mime_type` (lesson
+    resources, assignment submissions).
+    """
+    disposition_name = resource.original_name or f"download-{resource.pk}"
     if settings.USE_S3_STORAGE:
         # Short-lived signed URL; the bucket itself is private.
         url = resource.file.storage.url(

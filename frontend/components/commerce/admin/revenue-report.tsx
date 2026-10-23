@@ -150,7 +150,7 @@ function Breakdown({ title, rows }: { title: string; rows: RevenueBreakdown[] | 
           <p className="text-sm text-muted">Nothing in this period.</p>
         </CardBody>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className={theadClass}>
               <tr>

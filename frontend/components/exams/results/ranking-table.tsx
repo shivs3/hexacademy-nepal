@@ -16,7 +16,7 @@ export function RankingTable({ ranking }: { ranking: Ranking }) {
           Best attempt of each of {ranking.participants} learner{ranking.participants === 1 ? "" : "s"}. Other learners are shown by initials.
         </p>
       </CardHeader>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
           <thead className={theadClass}>
             <tr>

@@ -40,6 +40,9 @@ LOCAL_APPS = [
     "apps.learning",
     "apps.assessments",
     "apps.commerce",
+    "apps.notifications",
+    "apps.live_classes",
+    "apps.certificates",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -211,6 +214,7 @@ REST_FRAMEWORK = {
         "exam_answer": "240/min",
         "newsletter": "10/hour",
         "payment": "30/min",
+        "certificate_verify": "60/min",
     },
 }
 
@@ -236,6 +240,13 @@ SPECTACULAR_SETTINGS = {
         "PaymentStatusEnum": "apps.commerce.models.Payment.Status",
         "PaymentProviderEnum": "apps.commerce.models.Payment.Provider",
         "CouponKindEnum": "apps.commerce.models.Coupon.Kind",
+        "BatchStatusEnum": "apps.live_classes.models.Batch.Status",
+        "ClassSessionStatusEnum": "apps.live_classes.models.ClassSession.Status",
+        "MeetingProviderEnum": "apps.live_classes.models.ClassSession.Provider",
+        "AttendanceStatusEnum": "apps.live_classes.models.AttendanceRecord.Status",
+        "SubmissionStatusEnum": "apps.learning.models.Submission.Status",
+        "CertificateStatusEnum": "apps.certificates.models.Certificate.Status",
+        "NotificationKindEnum": "apps.notifications.models.Notification.Kind",
     },
 }
 
@@ -268,6 +279,7 @@ CELERY_BEAT_SCHEDULE: dict[str, dict] = {
     "assessments-expire-attempts": {"task": "apps.assessments.tasks.expire_overdue_attempts", "schedule": 60.0},
     "commerce-reconcile-payments": {"task": "apps.commerce.tasks.reconcile_pending_payments", "schedule": 300.0},
     "commerce-expire-orders": {"task": "apps.commerce.tasks.expire_stale_orders", "schedule": 300.0},
+    "live-classes-send-reminders": {"task": "apps.live_classes.tasks.send_class_reminders", "schedule": 300.0},
 }
 
 # --- Payments. Credentials are only read from the environment.

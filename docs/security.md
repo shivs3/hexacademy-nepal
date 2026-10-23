@@ -76,6 +76,32 @@
 - **Least privilege.** Finance managers hold only `commerce.*` permissions (orders, refunds, coupons, revenue, payment settings) and no assessment, CMS or user-management rights. Support staff can view orders but not act on them. Content editors have no commerce permissions. Learners see only their own orders and payments (other references answer 404). Payment endpoints are throttled (`payment`, 30/min).
 - **Refunds** are recorded, not executed: finance pays the money back through the provider's merchant portal or the bank and records the amount and reference here. The amount is capped at what remains refundable, enforced by both the service and a database `CHECK`.
 
+## Live classes (M6)
+
+- **Meeting links are private.** Session lists and details never include the link or passcode. `POST /class-sessions/{id}/join/` returns them only after the server checks, at that moment, that the session is scheduled, the caller is a member of its batch, their enrollment in the course is active and the join window is open (15 minutes before the start until the end). Support staff can read schedules but never links.
+- **Only real provider links are stored.** A Google Meet link must be `https://meet.google.com/<code>`; a Zoom link must be a `/j/` or `/w/` join link (or a personal `/my/` link) on `zoom.us` or `zoom.com`. Zoom host/start links are refused, so a host key is never handed to learners. Links are normalised before saving.
+- **Attendance is marked by staff.** `joined_at` only records that a learner pressed Join here; it is not proof of attendance. Automatic attendance from Meet or Zoom is not implemented (it needs provider APIs, account plans and OAuth credentials).
+- Members can only be learners actively enrolled in the course. Scheduling, rescheduling, cancelling, membership and attendance changes are audited.
+
+## Assignments (M6)
+
+- Learners see published assignments only in courses where their enrollment is active, and only their own submission. Staff access follows the course's teaching team (or `grade_all_submissions`). Content editors can author assignments but cannot read learner work.
+- Answers and feedback are plain text, rendered as text (never HTML). Files go through the same content-type detection, size limit and private storage as lesson resources and are always downloaded as attachments.
+- Grades come only from the grading endpoint, capped at the assignment's `max_points`. A graded submission cannot be overwritten by the learner unless staff return it. Assignment authoring, grading, regrading and returns are audited (with points, not the learner's answer).
+
+## Certificates (M6)
+
+- **Issued only from server records.** Eligibility uses the enrollment's stored completion, finalised exam attempts with released results, and graded submissions. The claim endpoint just asks the server to check; nothing the browser sends counts as completion. A unique `(user, course)` constraint and a row lock make issuing idempotent under concurrent triggers.
+- **Public verification shows only what the printed certificate shows:** number, heading, recipient name, course title, issue date and status (with the revocation date). No email, user id or reason. The endpoint is unauthenticated, throttled (`certificate_verify`, 60/min per IP) and uses unguessable 8-character Crockford base32 numbers. The verify pages are `noindex`.
+- **Downloads.** A learner can only download their own PDF (other numbers answer 404). Staff downloads need `view_certificates` or `manage_certificates`. PDFs are rendered on request, drawn from plain text with no markup parsing, and sent with `Cache-Control: private, no-store`.
+- **Revocation** needs a reason, is audited, shows on the verify page and watermarks the PDF. A revoked certificate is never re-issued automatically; reinstating it is a separate, audited staff action.
+- **Roles.** Content editors manage templates and rules; support staff can look up issued certificates read-only. Neither gains exam or payment rights.
+
+## Notifications (M6)
+
+- Notification links must be internal paths (enforced by a database `CHECK`), so a notice can never send a learner to another site.
+- Email goes only to active accounts with a verified address, after the triggering transaction commits. A failed email never undoes the in-app notice. Emails contain no meeting links or passcodes.
+
 ## Reporting a vulnerability
 
 Email security@hexacademynepal.com (to be set up before launch).

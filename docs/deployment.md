@@ -65,6 +65,25 @@ No production payment credentials are in this repository, and none have been tes
 5. Record a refund.
 6. Compare the revenue report with the merchant dashboards.
 
+## Live classes: Google Meet and Zoom
+
+Live classes work today with **instructor-managed links**: the instructor creates the meeting in their own Google Meet or Zoom account and pastes the join link when scheduling. No provider credentials are needed and none are configured.
+
+What is not implemented, and what it would need:
+
+- **Creating meetings automatically.** Zoom needs a Server-to-Server OAuth (or OAuth) app in the Zoom Marketplace with meeting scopes. Google Meet needs a Google Cloud project with the Calendar API (meetings are created as Calendar events with conference data) and OAuth consent for the organiser's Workspace account. Each would become a `create_meeting` method on its provider in `apps/live_classes/providers.py`, with credentials read only from the environment. Confirm the scopes and plan requirements in the providers' current documentation first.
+- **Automatic attendance and recordings.** Zoom's participant reports and cloud recordings need a paid plan and the matching API scopes; Meet attendance and recordings need Google Workspace editions that offer them. Until then, staff mark attendance and paste recording links.
+
+Production checks: the beat container must run (class reminders go out every 5 minutes for sessions starting within the hour), and `TIME_ZONE` stays `Asia/Kathmandu`.
+
+## Email and notifications
+
+In-app notifications always work. Email copies (class reminders, reschedules and cancellations, graded or returned assignments, issued certificates) go to verified addresses through the Celery worker. Set the `EMAIL_*` variables and `DEFAULT_FROM_EMAIL` from `.env.example` with a transactional mail provider, and set up SPF, DKIM and DMARC for the sending domain. `FRONTEND_URL` must be the public site address: it is printed on certificates as the verification link.
+
+## Certificates
+
+Certificate PDFs use reportlab's built-in fonts, which cover Latin text only. Names written in Devanagari will not render correctly in the PDF (the verify page shows them fine). Before issuing to learners with non-Latin names, bundle a font with Devanagari coverage (for example Noto Sans Devanagari, SIL Open Font License) and register it in `apps/certificates/pdf.py`.
+
 ## TLS
 
 Recommended: Cloudflare SSL mode **Full (strict)** with a Cloudflare Origin Certificate installed in Nginx. Add a `listen 443 ssl` server block using the origin cert and key, mount them read-only, and redirect port 80 to 443. Until that's done, use "Flexible" mode only for a first smoke test, never for real traffic.
@@ -102,3 +121,5 @@ docker image prune -f
 - [ ] A backup + restore round trip works on staging
 - [ ] The Celery worker and beat are running (`docker compose logs worker beat`)
 - [ ] The payment staging test above passes with each provider's test credentials, then live keys are swapped in
+- [ ] A test email arrives (verify address, then a class reminder) with SPF/DKIM passing
+- [ ] A certificate PDF downloads and its printed verification link opens the public verify page

@@ -94,17 +94,35 @@ frontend/
 - Enrollment stays in `apps/learning` (`enroll_purchase`); commerce calls it and never writes enrollments directly.
 - Frontend: `/checkout?course=` (quote, coupon, method), the provider redirect, `/checkout/complete/{reference}` (server verification with short polling), `/dashboard/orders` (history, receipts, bank-transfer form, pay again). Staff use `/admin/commerce/*`: orders (queues for transfers and flagged orders), coupons, revenue (chart and CSV) and payment settings.
 
+## Live classes, assignments and certificates (M6)
+
+- `apps/live_classes` owns batches (cohorts of one course), members, class sessions and attendance.
+  - `policies.py`: who sees and changes what (all-class managers, support staff read-only without links, the course's teaching team, batch members).
+  - `services.py`: batch and member rules (only actively enrolled learners can be added), scheduling with weekly repeats (up to 26), rescheduling and cancelling with notifications, the join gate, attendance marking and due reminders.
+  - `providers.py`: one `MeetingProvider` per service (Google Meet, Zoom). Today each validates an instructor-created link and extracts the meeting id; API meeting creation can be added per provider later without touching the rest (ADR-033).
+  - `tasks.py`: the reminder beat job (every 5 minutes, for sessions starting within 60 minutes, once per session).
+- Assignments live in `apps/learning` next to the course they belong to: `assignment_policies.py`, `assignment_services.py` (submit, resubmit, grade, return), `assignment_views.py`. Submission files use the same private storage and delivery code as lesson resources.
+- `apps/notifications` stores in-app notifications and emails them after commit through a Celery task. Other apps call `notifications.notify(...)` and never write the table directly.
+- `apps/certificates` owns templates, per-course rules and issued certificates.
+  - `services.py`: eligibility from server records only, idempotent issuing, revocation and reinstatement, rule validation.
+  - `pdf.py`: renders the PDF with reportlab on each download (nothing is stored).
+  - Learning, assessments and assignment grading call `certificates.services.check_after_commit(...)` through lazy imports, so a check runs after the triggering transaction commits and a failure never breaks it.
+- Frontend:
+  - Learners: `/dashboard/classes` (upcoming and past sessions, join button), `/dashboard/assignments`, `/dashboard/certificates`, `/dashboard/notifications`.
+  - Public: `/certificates/verify` and `/certificates/verify/{number}`.
+  - Staff: `/admin/live-classes` (batches, members, sessions, attendance), `/admin/learning/assignments` (authoring and grading) and `/admin/certificates` (issued, course rules, templates).
+
 ## Roles
 
 | Role | Scope |
 | --- | --- |
 | Super admin | Everything. Granted only from the CLI (`grant_role`), audited. |
-| Content editor | CMS pages (incl. publishing), menus, site settings, blog, media, newsletter list (M2); public catalog (M3) |
-| Instructor | Own courses and lessons (M3); questions and exams for courses they teach, plus read access to the shared active bank (M4); live sessions (M6) |
-| Teaching assistant | Assigned courses: read-only course view and learner progress (M3); their courses' exams and results, never the bank (M4); attendance (M6) |
+| Content editor | CMS pages (incl. publishing), menus, site settings, blog, media, newsletter list (M2); public catalog (M3); assignment authoring but not submissions, certificate templates and rules (M6) |
+| Instructor | Own courses and lessons (M3); questions and exams for courses they teach, plus read access to the shared active bank (M4); batches, sessions, members, attendance and assignment grading for courses they teach (M6) |
+| Teaching assistant | Assigned courses: read-only course view and learner progress (M3); their courses' exams and results, never the bank (M4); their courses' batches and sessions (no rescheduling), attendance and assignment grading (M6) |
 | Exam coordinator | The whole question bank including answer keys, every exam and every result (M4) |
 | Finance manager | Orders, payment verification, bank-transfer review, refunds, coupons, revenue reports, payment settings. No answer keys, CMS, users or security settings (M5) |
-| Support staff | User directory, activate/deactivate accounts, enrollments (grant, revoke, progress), read-only orders (M5) |
+| Support staff | User directory, activate/deactivate accounts, enrollments (grant, revoke, progress), read-only orders (M5); class schedules without meeting links, issued certificates read-only (M6) |
 | Student | Own learning, exams, orders, certificates |
 
 The UI hides what a user cannot use, but **every check is enforced again in the API**, including object-level checks (for example, an instructor may only edit their own courses).

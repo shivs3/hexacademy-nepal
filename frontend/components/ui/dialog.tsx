@@ -35,7 +35,7 @@ export function Dialog({
             className,
           )}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4">
             <div>
               <D.Title className="text-base font-semibold text-navy">{title}</D.Title>
               {description ? (
@@ -48,8 +48,8 @@ export function Dialog({
               <X className="h-4 w-4" />
             </D.Close>
           </div>
-          <div className="overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="flex justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
+          <div className="min-h-0 overflow-y-auto px-5 py-4">{children}</div>
+          {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
         </D.Content>
       </D.Portal>
     </D.Root>

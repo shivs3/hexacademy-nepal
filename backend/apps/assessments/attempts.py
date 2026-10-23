@@ -287,6 +287,10 @@ def finalize(attempt_id: int, status: str) -> ExamAttempt:
     pass_marks = attempt.exam.pass_marks
     attempt.passed = None if pass_marks is None else score >= pass_marks
     attempt.save()
+    if attempt.passed:
+        from apps.certificates.services import check_after_commit
+
+        check_after_commit(attempt.user_id, attempt.exam.course_id)
     return attempt
 
 

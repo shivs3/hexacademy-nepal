@@ -52,13 +52,19 @@ ROLES: dict[str, Role] = {
             "cms.view_newsletter_subscribers",
             "catalog.manage_catalog",
             "catalog.publish_courses",
+            "certificates.manage_certificates",
         ),
     ),
     INSTRUCTOR: Role(
         INSTRUCTOR,
         "Instructor",
         "Authors and teaches assigned courses, exams and live classes.",
-        (_ADMIN_PANEL, "catalog.author_assigned_courses", "assessments.author_course_assessments"),
+        (
+            _ADMIN_PANEL,
+            "catalog.author_assigned_courses",
+            "assessments.author_course_assessments",
+            "live_classes.teach_assigned_classes",
+        ),
     ),
     EXAM_COORDINATOR: Role(
         EXAM_COORDINATOR,
@@ -70,7 +76,7 @@ ROLES: dict[str, Role] = {
         TEACHING_ASSISTANT,
         "Teaching Assistant",
         "Supports instructors on assigned courses: reviews submissions and attendance.",
-        (_ADMIN_PANEL,),
+        (_ADMIN_PANEL, "live_classes.teach_assigned_classes"),
     ),
     FINANCE_MANAGER: Role(
         FINANCE_MANAGER,
@@ -89,7 +95,7 @@ ROLES: dict[str, Role] = {
     SUPPORT_STAFF: Role(
         SUPPORT_STAFF,
         "Support Staff",
-        "Helps learners: views accounts and orders, can activate or deactivate accounts.",
+        "Helps learners: views accounts, orders and class schedules, can activate or deactivate accounts.",
         (
             _ADMIN_PANEL,
             "accounts.view_user_directory",
@@ -97,6 +103,8 @@ ROLES: dict[str, Role] = {
             "learning.manage_enrollments",
             "learning.view_learner_progress",
             "commerce.view_orders",
+            "live_classes.view_all_classes",
+            "certificates.view_certificates",
         ),
     ),
     STUDENT: Role(STUDENT, "Student", "Learner account.", (), staff=False),

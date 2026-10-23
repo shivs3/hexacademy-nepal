@@ -96,7 +96,7 @@ export function OrdersList() {
         <EmptyState icon={Receipt} title={filtered ? "No orders match these filters" : "No orders yet"} />
       ) : data ? (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[52rem] text-left text-sm">
               <thead className={theadClass}>
                 <tr>

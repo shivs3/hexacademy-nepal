@@ -63,7 +63,7 @@ export function CourseCategoriesManager() {
         <EmptyState icon={Tags} title="No categories yet" description="Create categories such as “Programming” or “Engineering entrance” to organise courses." />
       ) : data ? (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead className={theadClass}>
                 <tr>

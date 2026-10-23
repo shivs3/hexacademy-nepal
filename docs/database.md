@@ -151,6 +151,32 @@ All money is `Decimal(12, 2)` in NPR; no floats anywhere, including the frontend
 
 Custom permissions: `commerce.view_orders`, `manage_orders`, `manage_refunds`, `manage_coupons`, `view_revenue`, `manage_payment_settings`.
 
+## Live classes, assignments, notifications and certificates (M6)
+
+```
+Course ──< Batch ──< BatchMembership >── User        batch.course PROTECT; memberships CASCADE
+Batch ──< ClassSession ──< AttendanceRecord >── User  sessions and attendance CASCADE; session.instructor SET_NULL
+Course ──< Assignment ──< Submission >── User         assignment.course CASCADE; submission.assignment PROTECT; lesson SET_NULL
+User ──< Notification                                 CASCADE
+Course ──1 CertificateRule ──► CertificateTemplate    rule.course CASCADE; rule.template PROTECT; rule.required_exam ──► Exam PROTECT
+User ──< Certificate >── Course                       user, course and template PROTECT
+```
+
+| Table | Key columns and rules |
+| --- | --- |
+| `live_classes_batch` | `name` (unique per course), `description`, `starts_on` / `ends_on` (`CHECK` ordered), `capacity` (null = no limit, `CHECK` ≥ 1), `status` active/archived (indexed). Permissions `manage_all_classes`, `view_all_classes`, `teach_assigned_classes` |
+| `live_classes_batchmembership` | Unique `(batch, user)`. Only learners with an active enrollment in the batch's course can be added (service rule) |
+| `live_classes_classsession` | `starts_at` (indexed), `ends_at` (`CHECK` after start; 15 min to 8 h by service rule), `provider` google_meet/zoom, **private** `join_url`, `external_meeting_id`, `passcode`, `status` scheduled/cancelled (`CHECK` cancelled has `cancelled_at`), `cancel_reason`, `series_id` (weekly repeats), `original_starts_at` (first reschedule), `reminder_sent_at`, `recording_url`, `notes`. Indexes `(batch, starts_at)`, `(status, starts_at)` |
+| `live_classes_attendancerecord` | Unique `(session, user)`. `joined_at` (set when the learner used the join button), `status` present/late/absent/excused or blank (`CHECK` a marked row has `marked_at`), `note`, `marked_by` |
+| `learning_assignment` | `title`, `instructions` (sanitised rich text), `lesson` (optional), `due_at`, `allow_late`, `accepts_text` / `accepts_file` (`CHECK` at least one), `max_points` (`CHECK` 1 to 1000), `is_published`. Index `(course, is_published)`. Permission `grade_all_submissions` |
+| `learning_submission` | Unique `(assignment, user)`. `status` submitted/returned/graded (indexed), `text` (plain), `file` (private storage key only), `original_name`, `mime_type`, `size_bytes`, `attempt`, `submitted_at`, `is_late`, `points`, `feedback` (plain), `graded_by`, `graded_at`. `CHECK`s: text or file present; a graded row has points and `graded_at`. Index `(assignment, status)` |
+| `notifications_notification` | `kind` (class reminder/rescheduled/cancelled/recording, submission graded/returned, certificate issued, general), `title`, `body`, `link` (`CHECK` internal path: starts with `/`, not `//`), `read_at`, `emailed_at`. Index `(user, read_at, -created_at)` |
+| `certificates_certificatetemplate` | `name` unique, `heading`, `statement`, `signatory_name`, `signatory_title`, `footer_note`. Permissions `manage_certificates`, `view_certificates` |
+| `certificates_certificaterule` | One per course. `is_enabled`, `template`, `require_lessons`, `required_exam` (must belong to the course and have a pass mark), `require_assignments`, `updated_by` |
+| `certificates_certificate` | `number` unique (`HXN-<year>-<8 Crockford base32>`), `recipient_name` and `course_title` snapshots, `issued_at`, `status` valid/revoked, `revoked_at` (`CHECK` a revoked row has it), `revoked_reason`, `revoked_by`. **Unique `(user, course)`** (`certificates_one_per_course`), so concurrent triggers cannot issue twice |
+
+Meeting links and passcodes never leave the server except through the join endpoint. Submission and certificate rows `PROTECT` what they depend on, so learner work and issued certificates survive edits: unpublish an assignment or disable a rule instead of deleting it.
+
 ## Backups
 
 See [deployment.md](deployment.md#backups). Use `pg_dump` custom format daily, keep copies off-host, and test restores.

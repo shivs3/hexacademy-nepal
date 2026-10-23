@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell, type NavItem, type NavSection } from "@/components/shell/app-shell";
 import { requireStaff } from "@/lib/auth";
-import { canOpenBank, canOpenCatalog, canOpenEnrollments, canOpenExams, canOpenOrders, hasAnyPerm, hasPerm } from "@/lib/permissions";
+import { canOpenAssignments, canOpenBank, canOpenCertificates, canOpenCatalog, canOpenEnrollments, canOpenExams, canOpenLiveClasses, canOpenOrders, hasAnyPerm, hasPerm } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: { default: "Staff", template: "%s | Staff | Hexacademy Nepal" }, robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -19,6 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (hasPerm(user, "catalog.manage_catalog"))
     learning.push({ href: "/admin/catalog/categories", label: "Course categories", icon: "categories" });
   if (canOpenEnrollments(user)) learning.push({ href: "/admin/learning/enrollments", label: "Enrollments", icon: "enrollments" });
+  if (canOpenAssignments(user)) learning.push({ href: "/admin/learning/assignments", label: "Assignments", icon: "assignments" });
+  if (canOpenLiveClasses(user)) learning.push({ href: "/admin/live-classes", label: "Live classes", icon: "live" });
+  if (canOpenCertificates(user)) learning.push({ href: "/admin/certificates", label: "Certificates", icon: "certificates" });
 
   const assessments: NavItem[] = [];
   if (canOpenExams(user)) assessments.push({ href: "/admin/assessments/exams", label: "Exams", icon: "exams" });
