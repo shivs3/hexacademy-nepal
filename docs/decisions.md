@@ -225,3 +225,14 @@ Short records of choices that are expensive to reverse. Newest last.
 
 **Decision:** `apps/notifications` stores one row per user and event. Email is sent only to verified, active accounts, after the transaction commits, via Celery. Links must be internal paths. Emails never include meeting links or passcodes; learners join from the site.
 **Consequences:** Email failures never break the action that caused them, and nothing private travels by email. There are no per-user email preferences yet.
+
+## ADR-044: Nonce-based CSP for scripts, inline styles allowed
+
+**Decision:** `proxy.ts` sets a per-request CSP with `script-src 'self' 'nonce-…' 'strict-dynamic'` on every page. Every page already renders dynamically (ADR-006), so nonces cost nothing extra. Styles allow `'unsafe-inline'` because Radix, Tiptap and KaTeX inject styles at runtime and React renders style attributes. Extra origins (media, the eSewa form host, a report URI) come from validated environment variables.
+**Consequences:** An injected `<script>` or inline handler cannot run, even if sanitisation fails somewhere. CSS injection is still possible but cannot execute code. Any new third-party script, frame or font host must be added to `lib/csp.ts`, and the E2E CSP spec fails until it is. Pages cannot be cached as static HTML at the CDN.
+
+## ADR-045: Server renders forward the visitor's IP to Django
+
+**Decision:** Next.js server renders call Django directly over the internal network. `lib/api/server.ts` forwards the `X-Forwarded-For` that Nginx set (a single overwritten client IP, validated as an IP) and `X-Request-ID`. Django keeps trusting exactly one hop.
+**Consequences:** Anonymous rate limits apply per visitor. Without this, all anonymous page renders shared the frontend container's address, and each render makes several API calls, so modest anonymous traffic would exhaust the 120/min limit and turn pages into errors for everyone (found when the E2E suite ran against a production build). Audit logs record the visitor's address for server-side calls. In development without Nginx, renders still share one address, so `DJANGO_E2E_RELAXED_THROTTLES` also raises the anonymous and user limits.
+

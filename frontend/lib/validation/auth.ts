@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /**
  * Client-side validation mirrors the backend rules for fast feedback only;

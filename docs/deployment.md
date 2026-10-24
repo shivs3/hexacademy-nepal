@@ -84,6 +84,16 @@ In-app notifications always work. Email copies (class reminders, reschedules and
 
 Certificate PDFs use reportlab's built-in fonts, which cover Latin text only. Names written in Devanagari will not render correctly in the PDF (the verify page shows them fine). Before issuing to learners with non-Latin names, bundle a font with Devanagari coverage (for example Noto Sans Devanagari, SIL Open Font License) and register it in `apps/certificates/pdf.py`.
 
+## Content-Security-Policy
+
+The frontend sends a nonce-based CSP on every page (`docs/security.md`). Set these in `.env` for the frontend container:
+
+- `CSP_MEDIA_ORIGINS`: the public media origin (the R2 custom domain, `S3_PUBLIC_CUSTOM_DOMAIN` with `https://`).
+- `CSP_FORM_ACTION_ORIGINS`: the origin of `ESEWA_FORM_URL`. The default is eSewa's UAT host; when you switch to eSewa's production URL, put its origin here too, or the browser blocks the checkout form.
+- `CSP_REPORT_URI` (optional): a report collector. Leave it empty if you don't run one.
+
+Adding a third-party script, iframe or font host later means adding it in `frontend/lib/csp.ts`; `npm run e2e` (`csp.spec.ts`) catches anything missed.
+
 ## TLS
 
 Recommended: Cloudflare SSL mode **Full (strict)** with a Cloudflare Origin Certificate installed in Nginx. Add a `listen 443 ssl` server block using the origin cert and key, mount them read-only, and redirect port 80 to 443. Until that's done, use "Flexible" mode only for a first smoke test, never for real traffic.
@@ -123,3 +133,5 @@ docker image prune -f
 - [ ] The payment staging test above passes with each provider's test credentials, then live keys are swapped in
 - [ ] A test email arrives (verify address, then a class reminder) with SPF/DKIM passing
 - [ ] A certificate PDF downloads and its printed verification link opens the public verify page
+- [ ] The browser console shows no CSP violations on the home page, a course page, checkout (each enabled gateway) and the admin editor
+- [ ] Two different client IPs browsing anonymously are throttled separately (Django logs show the visitor IP, not the frontend container's)

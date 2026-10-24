@@ -48,6 +48,14 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
       - run: pytest --create-db
+      - name: Django deployment checklist (production settings)
+        run: python manage.py check --deploy --fail-level WARNING
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_SECRET_KEY: ci-only-not-a-real-secret-key-0123456789-abcdefghijklmnop
+          DJANGO_ALLOWED_HOSTS: hexacademynepal.com
+      - name: Audit Python dependencies
+        run: pip-audit -r requirements.txt
 
   frontend:
     runs-on: ubuntu-latest
@@ -62,6 +70,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -90,6 +100,7 @@ jobs:
       E2E_EDITOR_EMAIL: e2e-editor@example.com
       E2E_EDITOR_PASSWORD: ci-only-E2E-editor-91
       E2E_INSTRUCTOR_EMAIL: e2e-instructor@example.com
+      E2E_INSTRUCTOR_PASSWORD: ci-only-E2E-instructor-37
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -112,7 +123,8 @@ jobs:
           from apps.accounts.models import User
           u = User.objects.create_user(email=os.environ['E2E_EDITOR_EMAIL'], password=os.environ['E2E_EDITOR_PASSWORD'], full_name='E2E Editor')
           u.is_staff = True; u.email_verified_at = timezone.now(); u.save()
-          User.objects.create_user(email=os.environ['E2E_INSTRUCTOR_EMAIL'], password=None, full_name='E2E Instructor', is_staff=True)"
+          i = User.objects.create_user(email=os.environ['E2E_INSTRUCTOR_EMAIL'], password=os.environ['E2E_INSTRUCTOR_PASSWORD'], full_name='E2E Instructor', is_staff=True)
+          i.email_verified_at = timezone.now(); i.save()"
           python manage.py grant_role "$E2E_EDITOR_EMAIL" --role content_editor
           python manage.py grant_role "$E2E_EDITOR_EMAIL" --role exam_coordinator
           python manage.py grant_role "$E2E_INSTRUCTOR_EMAIL" --role instructor

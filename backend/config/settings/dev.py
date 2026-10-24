@@ -20,4 +20,8 @@ if env.bool("DJANGO_E2E_RELAXED_THROTTLES", default=False):
         **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],  # noqa: F405
         "login": "300/min",
         "register": "300/min",
+        # Without Nginx, every server render shares the Next server's address.
+        "anon": "3000/min",
+        # One editor account drives most specs back to back.
+        "user": "3000/min",
     }

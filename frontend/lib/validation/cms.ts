@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /** Client-side checks for fast feedback only; the API re-validates everything. */
 export const newsletterSchema = z.object({

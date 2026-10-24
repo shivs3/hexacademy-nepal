@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 import { LoadError, TableSkeleton, th, theadClass } from "@/components/cms/admin/list-parts";
 import { Button } from "@/components/ui/button";

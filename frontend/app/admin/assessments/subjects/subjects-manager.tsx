@@ -5,7 +5,7 @@ import { FolderTree, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 import { LoadError, TableSkeleton } from "@/components/cms/admin/list-parts";
 import { Button } from "@/components/ui/button";

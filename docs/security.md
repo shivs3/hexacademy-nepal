@@ -41,8 +41,20 @@
 ## Transport and headers
 
 - HTTPS-only in production: `SECURE_SSL_REDIRECT`, HSTS (30 days by default, preload opt-in), Secure cookies and `Cross-Origin-Opener-Policy: same-origin`.
-- Next.js sends `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY` and `Permissions-Policy`. A strict CSP comes in M7, once the set of third-party embeds (video, payment redirects) is known.
+- Next.js sends `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY` and `Permissions-Policy`.
+- Content-Security-Policy (ADR-044), set per request by `frontend/proxy.ts` from `frontend/lib/csp.ts`:
+  - `script-src 'self' 'nonce-…' 'strict-dynamic'`. A fresh 128-bit nonce per response; Next.js applies it to its own scripts. No inline or `eval` scripts in production (development adds `'unsafe-eval'` for React's error overlay). Zod runs `jitless` so it never probes `new Function`.
+  - `style-src 'self' 'unsafe-inline'`: Radix's scroll lock, Tiptap and KaTeX inject styles at runtime. Style injection cannot run code.
+  - `frame-src` allows only the two hosts `apps/cms/sanitize.video_embed_url` produces (youtube-nocookie.com, player.vimeo.com). `form-action` allows `'self'` plus `CSP_FORM_ACTION_ORIGINS` (the eSewa form host). `img-src`/`media-src` add `CSP_MEDIA_ORIGINS`.
+  - `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`, and `upgrade-insecure-requests` on HTTPS requests. Env values are validated as bare origins so they cannot add directives.
+  - `e2e/csp.spec.ts` fails on any `securitypolicyviolation` across public pages, a dialog and the rich-text editor.
+  - The Django API renders JSON only (the browsable API is not enabled), so its responses carry no page CSP.
 - Client IPs: Nginx resolves the real IP from Cloudflare's published ranges and forwards it as a single overwritten `X-Forwarded-For`. Django trusts exactly one hop (`NUM_PROXIES=1`).
+- Server renders call Django directly, so `lib/api/server.ts` forwards that same validated `X-Forwarded-For` (and `X-Request-ID`). Each visitor then has their own anonymous rate limit, instead of every page render sharing the Next server's address (ADR-045).
+
+## Dependency scanning
+
+- CI runs `pip-audit -r requirements.txt` and `npm audit --omit=dev --audit-level=high`, and `manage.py check --deploy --fail-level WARNING` under production settings. HSTS preload (W021) is silenced only while `DJANGO_HSTS_PRELOAD` is off.
 
 ## Infrastructure
 

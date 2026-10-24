@@ -91,6 +91,9 @@ services:
     image: hexacademy/frontend:latest
     environment:
       INTERNAL_API_URL: http://backend:8000
+      CSP_MEDIA_ORIGINS: ${CSP_MEDIA_ORIGINS:-https://media.hexacademynepal.com}
+      CSP_FORM_ACTION_ORIGINS: ${CSP_FORM_ACTION_ORIGINS:-https://rc-epay.esewa.com.np}
+      CSP_REPORT_URI: ${CSP_REPORT_URI:-}
     depends_on: [backend]
     restart: unless-stopped
     networks: [internal]
