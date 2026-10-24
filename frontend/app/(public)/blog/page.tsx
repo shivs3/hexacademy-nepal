@@ -99,7 +99,7 @@ export default async function BlogIndex({ searchParams }: Props) {
                   ← Newer
                 </Link>
               ) : (
-                <span className="text-muted/50">← Newer</span>
+                <span aria-disabled="true" className="cursor-default text-muted">← Newer</span>
               )}
               <span className="text-muted">
                 Page {posts.page} of {posts.total_pages}
@@ -109,7 +109,7 @@ export default async function BlogIndex({ searchParams }: Props) {
                   Older →
                 </Link>
               ) : (
-                <span className="text-muted/50">Older →</span>
+                <span aria-disabled="true" className="cursor-default text-muted">Older →</span>
               )}
             </nav>
           )}

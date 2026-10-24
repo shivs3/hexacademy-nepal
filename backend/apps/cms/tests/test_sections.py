@@ -20,6 +20,21 @@ def test_rich_text_strips_scripts_handlers_and_bad_urls():
     assert 'data-type="inline-math"' in clean and 'data-latex="x^2"' in clean
 
 
+@pytest.mark.parametrize(
+    ("html", "empty"),
+    [
+        ("", True),
+        ("<p> &nbsp;</p>", True),
+        ('<span data-type="inline-math" data-latex=" "></span>', True),
+        ('<span data-type="inline-math" data-latex="\\sqrt{7}"></span>', False),
+        ('<p><span data-type="inline-math" data-latex="x^2"></span></p>', False),
+        ("<p>text</p>", False),
+    ],
+)
+def test_rich_text_is_empty_counts_formulas_as_content(html, empty):
+    assert sanitize.rich_text_is_empty(sanitize.clean_rich_text(html)) is empty
+
+
 def test_rich_text_restricts_data_type_values():
     assert "data-type" not in sanitize.clean_rich_text('<span data-type="evil">x</span>')
 

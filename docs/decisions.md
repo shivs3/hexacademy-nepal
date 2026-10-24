@@ -255,3 +255,20 @@ Short records of choices that are expensive to reverse. Newest last.
 
 **Decision:** `backup.sh` and `restore.sh` keep the compose mode and add a `DATABASE_URL` mode that uses the host's `pg_dump` and `pg_restore`, because the recommended production database is managed and has no compose service.
 **Consequences:** The same scripts work for both deployments, and the restore drill could run locally. In URL mode the restore script cannot stop the application or run migrations; it says so, and the deployment guide lists the steps.
+
+## ADR-050: Demo seeds upgrade only untouched demo content
+**Decision:** `seed_cms` keeps the content of earlier seed versions (`PREVIOUS_SECTIONS` and `PREVIOUS_MENUS`). It replaces a page or menu only when that page or menu exactly matches an earlier seed. For a page, that means both the draft and the published version. Sections are compared without their random ids. An upgrade saves a new version with the note "Demo content upgrade", so the old content stays in the history.
+**Consequences:** Existing dev databases get the new demo content. Anything an administrator has touched, even an unpublished draft, is never overwritten. Whenever the seed content changes, the old content must be added to `PREVIOUS_*`.
+
+## ADR-051: Demo testimonials, statistics and exam content stay honest
+**Decision:**
+- The seeded testimonials are named "Sample learner A/B/C". Their heading and every quote say they are placeholders.
+- The statistics section shows only facts about the published exam pattern (100 marks, 2 hours, the negative marking and the number of questions), not figures about learners.
+- The IOE MSc practice test covers Section A only (reasoning and engineering mathematics, weighted as the published syllabus describes). Every question was written for this project. Section B depends on the programme, and its syllabus could not be verified, so it is not seeded.
+- The exam instructions, a blog post and the course page all tell learners to check the official IOE notice.
+
+**Consequences:** The demo follows CLAUDE.md's rules against invented testimonials and statistics. The owner must replace the samples before launch.
+
+## ADR-052: Element defaults sit in Tailwind's base layer
+**Decision:** The global `body`, `h1`–`h4` and `:focus-visible` rules are inside `@layer base`. Before this, the unlayered `h2 { color: navy }` rule beat utilities such as `text-white`, so headings in dark and accent sections were navy on teal (2.22:1). Text in mint uses `mint-800` (8.65:1 on `mint-50`), because brand mint is a fill colour.
+**Consequences:** Utilities always win over the element defaults. axe found this only once the demo home page used dark and accent sections, and the a11y E2E spec now covers it.

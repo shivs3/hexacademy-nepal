@@ -28,6 +28,8 @@
   --color-teal-50: color-mix(in oklab, var(--brand-teal) 8%, white);
   --color-mint: var(--brand-mint);
   --color-mint-50: color-mix(in oklab, var(--brand-mint) 10%, white);
+  /* Mint is a fill colour; text in mint uses this darker shade for 4.5:1 on light surfaces. */
+  --color-mint-800: color-mix(in oklab, var(--brand-mint) 55%, black);
   --color-page: var(--surface-page);
   --color-card: var(--surface-card);
   --color-body: var(--text-body);
@@ -48,29 +50,35 @@
   --radius-card: 0.875rem;
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+/*
+ * Element defaults live in the base layer so utilities such as `text-white`
+ * override them; unlayered rules would beat every Tailwind utility.
+ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  background: var(--surface-page);
-  color: var(--text-body);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-}
+  body {
+    background: var(--surface-page);
+    color: var(--text-body);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
 
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-display);
-  color: var(--brand-navy);
-  letter-spacing: -0.015em;
-}
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    color: var(--brand-navy);
+    letter-spacing: -0.015em;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--brand-teal);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 2px solid var(--brand-teal);
+    outline-offset: 2px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

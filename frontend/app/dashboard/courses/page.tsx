@@ -53,7 +53,7 @@ export default async function MyCoursesPage({ searchParams }: { searchParams: Pr
                   ← Previous
                 </Link>
               ) : (
-                <span className="text-muted/50">← Previous</span>
+                <span aria-disabled="true" className="cursor-default text-muted">← Previous</span>
               )}
               <span className="text-muted">
                 Page {enrollments.page} of {enrollments.total_pages}
@@ -63,7 +63,7 @@ export default async function MyCoursesPage({ searchParams }: { searchParams: Pr
                   Next →
                 </Link>
               ) : (
-                <span className="text-muted/50">Next →</span>
+                <span aria-disabled="true" className="cursor-default text-muted">Next →</span>
               )}
             </nav>
           )}

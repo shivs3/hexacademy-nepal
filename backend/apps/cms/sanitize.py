@@ -50,7 +50,13 @@ def clean_rich_text(html: str) -> str:
     return cleaned.strip()
 
 
+_MATH_WITH_CONTENT = re.compile(r'<(?:span|div)\b[^>]*\bdata-latex="[^"]*\S[^"]*"')
+
+
 def rich_text_is_empty(html: str) -> bool:
+    # A formula node has no text between its tags, but it is content (e.g. an option "√7").
+    if _MATH_WITH_CONTENT.search(html or ""):
+        return False
     return not re.sub(r"<[^>]+>|&nbsp;|\s", "", html or "")
 
 

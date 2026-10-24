@@ -65,7 +65,7 @@ export function EmptyState({
 const badgeTones = {
   neutral: "bg-page text-muted border-line",
   teal: "bg-teal-50 text-teal-700 border-teal/20",
-  mint: "bg-mint-50 text-mint border-mint/25",
+  mint: "bg-mint-50 text-mint-800 border-mint/25",
   navy: "bg-navy text-white border-navy",
   success: "bg-success-50 text-success border-success/20",
   warning: "bg-warning-50 text-warning border-warning/20",

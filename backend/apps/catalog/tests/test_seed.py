@@ -16,6 +16,8 @@ def test_seed_publishes_with_instructor_and_is_idempotent(make_user, api_client)
     teacher = make_user(roles.INSTRUCTOR)
     call_command("seed_catalog", instructor=teacher.email)
     call_command("seed_catalog", instructor=teacher.email)
-    assert Course.objects.filter(status="published").count() == 2
+    assert Course.objects.filter(status="published").count() == 6
+    paid = Course.objects.get(slug="demo-ioe-msc-entrance-preparation")
+    assert paid.current_price() == 3500 and paid.price == 4500
     detail = api_client.get("/api/v1/courses/demo-python-fundamentals/").json()
     assert "Demo" in detail["title"] and "Demo content" in detail["description"]

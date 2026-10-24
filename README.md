@@ -72,8 +72,15 @@ uses the editor (who needs the `content_editor` role, which can manage certifica
 Backups: `infrastructure/scripts/backup.sh` and `restore.sh` (compose by default, or set `DATABASE_URL`); see
 [docs/deployment.md](docs/deployment.md#backups).
 
-Demo content, clearly labelled as such: `python manage.py seed_cms` (pages, menus, settings) and
-`python manage.py seed_catalog --instructor <email>` (two demo courses; without `--instructor` they stay drafts).
+Demo content, clearly labelled as such: `python manage.py seed_demo` loads everything at once. It creates a demo
+instructor (`demo-instructor@example.com`, with no usable password, so nobody can sign in as them) and then runs:
+
+- `seed_cms`: home and about pages, menus, settings and three blog posts. The testimonials are marked as samples and
+  need replacing with real quotes that learners have agreed to.
+- `seed_catalog --instructor <email>`: six demo courses with NPR prices. Without `--instructor` they stay drafts.
+- `seed_exams`: an IOE MSc entrance Section A practice test with 45 original questions and 50 marks.
+
+All of these can be run more than once. They never overwrite content an administrator has edited.
 
 ## Production
 

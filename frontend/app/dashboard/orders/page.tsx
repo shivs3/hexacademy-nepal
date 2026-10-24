@@ -71,7 +71,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams: Pro
                   ← Previous
                 </Link>
               ) : (
-                <span className="text-muted/50">← Previous</span>
+                <span aria-disabled="true" className="cursor-default text-muted">← Previous</span>
               )}
               <span className="text-muted">
                 Page {orders.page} of {orders.total_pages}
@@ -81,7 +81,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams: Pro
                   Next →
                 </Link>
               ) : (
-                <span className="text-muted/50">Next →</span>
+                <span aria-disabled="true" className="cursor-default text-muted">Next →</span>
               )}
             </nav>
           )}

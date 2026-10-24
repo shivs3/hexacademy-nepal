@@ -402,6 +402,42 @@ Update this file at the end of every milestone. Only record what was actually ex
 - There is no error-reporting service (Sentry or similar) yet. If one is added, PII must stay off.
 - The staging launch: run the staging validation checklist and the launch-readiness review in `docs/deployment.md`.
 
+## Demo data and IOE MSc practice test (2026-10-24)
+
+### Built
+
+- **`seed_demo`:** creates a demo instructor with no usable password, then runs the three seeds below. A re-run never changes an existing account's password or profile.
+- **`seed_cms`:**
+  - **Home page:** hero, featured courses, stats, categories, features, instructors, sample testimonials, FAQ, newsletter and a call to action.
+  - **About page.**
+  - **Menus:** the header and footer menus now link to Courses.
+  - **Blog:** two categories and three posts (the IOE pattern with source links, how practice tests work, and a weekly maths plan).
+  - **Upgrades:** content from an earlier seed is upgraded only if nobody has edited it (ADR-050).
+- **`seed_catalog`:** two new categories (mathematics, under engineering, and entrance preparation). It now has six demo courses with NPR prices; the IOE course costs Rs. 4,500, on sale for Rs. 3,500. Three courses are featured.
+- **`seed_exams` (data in `apps/assessments/demo_ioe.py`):** "IOE MSc Entrance — Section A Practice (Demo)", a 60-minute practice test with negative marking.
+  - **Reasoning:** 5 questions worth 2 marks each, with 0.2 off for a wrong answer.
+  - **Maths:** 40 questions worth 1 mark each, with 0.1 off for a wrong answer, split 3/8/6/12/3/4/4 across the syllabus topics.
+  - **Total:** 50 marks.
+  - **Questions:** all written for this project, with KaTeX formulas. The 15 answers that can be computed were checked numerically.
+  - **Sources:** edusanjal (exam and syllabus pages), ioenotes and piacademy.
+- **Fixes:**
+  - `rich_text_is_empty` treated an option made only of a formula (such as √7) as empty.
+  - Base-layer CSS (ADR-052).
+  - A mint badge text shade with enough contrast.
+  - The disabled pagination labels on lists had too little contrast; they now meet it and carry `aria-disabled`.
+
+### Verified (executed locally on 2026-10-24)
+
+- **Backend:** 432 tests pass. Ruff and the migration check are clean.
+- **Frontend:** tsc, eslint and vitest (134) pass, and the build succeeds.
+- **Playwright:** 40 of 40 pass against the production build.
+- **Dev database:** seeded, and it renders: /, /courses, a course page, /blog, a post and /about.
+
+### Not verified
+
+- Section B (the programme-specific part) of the IOE MSc syllabus. No reliable current source was found, so none is seeded.
+- The exam pattern has not been checked against the official IOE notice. The seeded content tells learners to check it themselves.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.
@@ -411,7 +447,7 @@ Update this file at the end of every milestone. Only record what was actually ex
    - The owner replaces the demo content and legal pages.
    - After launch, see the deferred items: provider refund APIs, Meet/Zoom OAuth, a cart and bundles, email preferences, a Devanagari certificate font, and caching if the load test needs it.
 3. Local dev:
-   - `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`.
+   - `python manage.py seed_demo` (or the individual `seed_cms`, `seed_catalog --instructor <email>` and `seed_exams`).
    - E2E needs `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD`, `E2E_INSTRUCTOR_EMAIL` and `E2E_INSTRUCTOR_PASSWORD`. The editor needs the `content_editor` and `exam_coordinator` roles; the instructor needs `instructor`.
    - Start Django with `DJANGO_E2E_RELAXED_THROTTLES=true` for full E2E runs. The commerce spec also needs `PAYMENTS_ENABLE_SANDBOX=true` and any `PAYMENTS_SANDBOX_SECRET` (`dev.py` enables the sandbox by default).
    - Run E2E against `npm run build && npm run start`, not `next dev`.

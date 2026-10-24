@@ -21,7 +21,8 @@ export function HeroSection({ data, first }: { data: SectionDataMap["hero"]; fir
             <p
               className={cn(
                 "mb-4 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider",
-                dark ? "bg-white/10 text-mint" : "bg-teal-50 text-teal-700",
+                // White, not mint: mint on navy is below 4.5:1, while white is guaranteed by the navy check.
+                dark ? "bg-white/10 text-white" : "bg-teal-50 text-teal-700",
               )}
             >
               {data.eyebrow}
