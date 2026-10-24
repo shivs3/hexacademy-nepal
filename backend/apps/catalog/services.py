@@ -202,10 +202,10 @@ def reorder_curriculum(course: Course, layout: list[dict]):
                 lesson.save(update_fields=["position", "module", "updated_at"])
 
 
+# Curriculum order: modules by position, then lessons by position within each.
+LESSON_ORDER = ("module__position", "module_id", "position", "id")
+
+
 def ordered_lessons(course: Course, *, published_only: bool = True):
-    qs = (
-        Lesson.objects.filter(course=course)
-        .select_related("module")
-        .order_by("module__position", "module_id", "position", "id")
-    )
+    qs = Lesson.objects.filter(course=course).select_related("module").order_by(*LESSON_ORDER)
     return qs.filter(is_published=True) if published_only else qs

@@ -60,10 +60,14 @@ def _require(allowed: bool, message: str):
 def annotate_batches(qs):
     now = timezone.now()
     upcoming = Q(sessions__status=ClassSession.Status.SCHEDULED, sessions__ends_at__gte=now)
-    return qs.select_related("course").annotate(
-        member_count=Count("memberships", distinct=True),
-        upcoming_count=Count("sessions", filter=upcoming, distinct=True),
-        next_session_at=Min("sessions__starts_at", filter=upcoming),
+    return (
+        qs.select_related("course")
+        .prefetch_related("course__instructor_links")
+        .annotate(
+            member_count=Count("memberships", distinct=True),
+            upcoming_count=Count("sessions", filter=upcoming, distinct=True),
+            next_session_at=Min("sessions__starts_at", filter=upcoming),
+        )
     )
 
 
@@ -200,8 +204,10 @@ class AdminSessionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
     serializer_class = AdminSessionSerializer
 
     def get_queryset(self):
-        qs = ClassSession.objects.filter(batch__in=policies.visible_batches(self.request.user)).select_related(
-            "batch__course", "instructor"
+        qs = (
+            ClassSession.objects.filter(batch__in=policies.visible_batches(self.request.user))
+            .select_related("batch__course", "instructor")
+            .prefetch_related("batch__course__instructor_links")
         )
         params = self.request.query_params
         if (batch := params.get("batch", "")).isdigit():

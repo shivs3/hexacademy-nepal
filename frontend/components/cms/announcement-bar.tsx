@@ -7,7 +7,7 @@ import { CmsLink } from "./cms-link";
 export function AnnouncementBar({ announcement }: { announcement: SiteSettings["announcement"] }) {
   if (!announcement) return null;
   return (
-    <div className="bg-teal text-white">
+    <div className="bg-teal-700 text-white">
       <p className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 text-center text-sm">
         <span>{announcement.text}</span>
         {announcement.link_label && announcement.link_url && (

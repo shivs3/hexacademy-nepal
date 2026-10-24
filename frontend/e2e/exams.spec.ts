@@ -1,5 +1,7 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
+import { axeViolations } from "./axe";
+
 /**
  * Question bank -> exam builder -> publish -> a learner takes the exam -> the
  * server grades it. Uses the content editor account from cms.spec.ts, which
@@ -75,7 +77,9 @@ test("a coordinator publishes an exam and a learner's attempt is graded by the s
   await expect(page.getByText("Exam published.")).toBeVisible();
 
   // A new learner takes the exam.
-  const student = await browser.newPage();
+  // axe needs a page from an explicit context.
+  const studentContext = await browser.newContext();
+  const student = await studentContext.newPage();
   const studentPassword = "Correct-Horse-42";
   await student.goto(`/register?next=${encodeURIComponent(`/dashboard/exams/${slug}`)}`);
   await student.getByLabel("Full name").fill("E2E Exam Learner");
@@ -113,6 +117,8 @@ test("a coordinator publishes an exam and a learner's attempt is graded by the s
   if (await listToggle.isVisible()) await listToggle.click();
   await student.getByRole("button", { name: "Question 1, answered" }).click();
   await expect(student.getByRole("radio", { name: /Option B/ })).toBeChecked();
+  // The player with an answered question and a selected option meets WCAG A/AA.
+  expect(await axeViolations(student)).toEqual([]);
 
   await student.getByRole("button", { name: "Next", exact: true }).click();
   const secondSave = student.waitForResponse((r) => r.url().includes("/answers/") && r.request().method() === "PUT");
@@ -141,5 +147,5 @@ test("a coordinator publishes an exam and a learner's attempt is graded by the s
   const coordinatorView = await page.request.get(`/api/v1/attempts/${attemptId}/`);
   expect(coordinatorView.status()).toBe(404);
   await stranger.close();
-  await student.close();
+  await studentContext.close();
 });

@@ -42,6 +42,9 @@ def can_create_course(user) -> bool:
 def teaching_role(user, course: Course) -> str | None:
     if not _authenticated(user):
         return None
+    # List views prefetch `instructor_links` so a page of rows costs no query each.
+    if "instructor_links" in getattr(course, "_prefetched_objects_cache", {}):
+        return next((link.role for link in course.instructor_links.all() if link.user_id == user.pk), None)
     return CourseInstructor.objects.filter(course=course, user=user).values_list("role", flat=True).first()
 
 

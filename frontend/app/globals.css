@@ -24,6 +24,7 @@
   --color-navy-900: color-mix(in oklab, var(--brand-navy) 85%, black);
   --color-teal: var(--brand-teal);
   --color-teal-700: color-mix(in oklab, var(--brand-teal) 80%, black);
+  --color-teal-800: color-mix(in oklab, var(--brand-teal) 65%, black);
   --color-teal-50: color-mix(in oklab, var(--brand-teal) 8%, white);
   --color-mint: var(--brand-mint);
   --color-mint-50: color-mix(in oklab, var(--brand-mint) 10%, white);

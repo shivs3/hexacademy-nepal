@@ -28,7 +28,7 @@ export function SectionContainer({
         "py-16 sm:py-20",
         tone === "white" && "bg-white",
         tone === "dark" && "bg-navy text-white",
-        tone === "accent" && "bg-teal text-white",
+        tone === "accent" && "bg-teal-700 text-white",
         className,
       )}
     >

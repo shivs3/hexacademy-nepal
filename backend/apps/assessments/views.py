@@ -5,7 +5,7 @@ Question content is read from the attempt snapshot, never from the bank, and
 answer keys only appear in the result review after release.
 """
 
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, status
@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 
 from apps.learning.models import Enrollment
 
-from . import attempts, results
+from . import attempts, results, services
 from .models import AttemptQuestion, Exam, ExamAttempt
 from .serializers import (
     AdvanceInputSerializer,
@@ -61,8 +61,17 @@ class ExamListView(generics.ListAPIView):
             qs = qs.filter(course__slug=course)
         if kind := self.request.query_params.get("kind"):
             qs = qs.filter(kind=kind)
+        mine = ExamAttempt.objects.filter(user=self.request.user)
+        qs = services.with_pool_totals(qs).prefetch_related(Prefetch("attempts", queryset=mine, to_attr="my_attempts"))
         # Open exams first (by closing time), then closed ones.
         return qs.order_by("status", "closes_at", "-published_at")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.request.user.is_authenticated:
+            enrolled = Enrollment.objects.filter(user=self.request.user, status=Enrollment.Status.ACTIVE)
+            context["enrolled_course_ids"] = set(enrolled.values_list("course_id", flat=True))
+        return context
 
 
 class ExamDetailView(generics.RetrieveAPIView):

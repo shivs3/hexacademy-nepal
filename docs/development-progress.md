@@ -12,7 +12,7 @@ Update this file at the end of every milestone. Only record what was actually ex
 | M4 | Exam engine: question bank, exams, server-authoritative attempts, autosave, grading, results and analytics | **Done** (assignments move to M6) |
 | M5 | Commerce: pricing, coupons, orders, Khalti/eSewa providers (from official docs), webhooks, refunds | **Done** (real gateways need merchant credentials; see below) |
 | M6 | Live classes (Meet/Zoom provider abstraction), assignments, and certificates with public verification | **Done** (Meet/Zoom APIs need OAuth credentials; links are instructor-managed) |
-| M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | Next |
+| M7 | Production readiness: CSP, observability, performance, accessibility audit, load test, staging launch | **Done locally** (load test and staging launch need a server; see below) |
 
 ## M1 — Foundation (completed 2026-10-17)
 
@@ -333,20 +333,87 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Template edits change certificates already issued, because PDFs are rendered on demand (ADR-042).
 - Notifications have no per-user email preferences yet.
 
+## M7 — Production readiness (completed locally 2026-10-24)
+
+### Built
+
+- **Part 1** (commit 6f07a14):
+  - A nonce-based Content-Security-Policy from `proxy.ts` / `lib/csp.ts`, with Zod running jitless (ADR-044).
+  - Server renders forward the visitor IP and request ID to Django (ADR-045).
+  - CI gains `check --deploy`, `pip-audit` and `npm audit`.
+  - `e2e/csp.spec.ts`.
+- **Observability:**
+  - `common/logging.py` adds a JSON formatter, enabled with `LOG_FORMAT=json`. Each line carries the request ID.
+  - `/readyz/` now checks the cache as well as the database, and returns 503 with the failing part.
+  - `tests/test_operations.py` covers the health endpoints, request IDs, the formatter and throttle identity behind one proxy, including a spoofed multi-hop `X-Forwarded-For`.
+- **Performance:**
+  - The `assert_constant_queries` fixture (ADR-047) has query-count tests for every list endpoint with per-row data, across catalog, CMS, learning, assessments, commerce, live classes, certificates and notifications.
+  - Fixed N+1s, with query counts going from 2 rows to 8 rows before the fix:
+    - me/enrollments, 6→18, fixed with `progress_summaries()`;
+    - the exam catalog, 8→26, fixed with `with_pool_totals()`, prefetched own attempts and the `eligibility()` hints;
+    - admin live sessions, 58→88;
+    - admin batches, fixed by prefetching instructor links and having `teaching_role` use them.
+- **Authorisation audit:**
+  - `tests/test_admin_permissions.py` (ADR-048) walks all 119 admin routes and checks every method for anonymous callers, students and 13 cross-domain role/prefix pairs.
+  - It found that assessments viewsets checked access only in `get_queryset`, so a finance manager's POST reached serializer validation (400 instead of 403), and `course-options` answered 200 with an empty list. Nothing was written and no answer keys were exposed, but the policies now run as DRF permission classes first.
+- **Accessibility:**
+  - `@axe-core/playwright` 4.13.0 is pinned.
+  - `e2e/axe.ts` and `e2e/a11y.spec.ts` check 7 public pages, a course page and 15 dashboard/admin pages, with status checks.
+  - The exams spec runs axe inside the player with an answer selected.
+  - Contrast fixes use `teal-700` / `teal-800` for text-bearing fills (ADR-046). The logo is exempt and excluded.
+  - Every CMS-accepted accent colour still gives at least 5.16:1 contrast, checked numerically.
+- **Backups:**
+  - `backup.sh` and `restore.sh` gain a `DATABASE_URL` mode for managed PostgreSQL (ADR-049). Pruning no longer relies on `xargs -r`, and dumps are created with umask 077.
+  - The restore drill is recorded in `docs/deployment.md`.
+- **Docs:**
+  - `docs/deployment.md`: the launch-readiness review, monitoring (readiness, JSON logs) and backups.
+  - `docs/security.md`: the authorisation audit, logging, and the accepted dev-only npm advisories.
+  - README: E2E against a production build, the axe and CSP specs, backups.
+
+### Verified (executed locally on 2026-10-24)
+
+- **Backend:**
+  - `pytest` reports **418 passed**.
+  - `ruff check` and `ruff format` are clean.
+  - `makemigrations --check` reports no changes.
+  - `spectacular --validate --fail-on-warn` passes.
+  - `check --deploy --fail-level WARNING` under `config.settings.prod` reports no issues (1 silenced: HSTS preload).
+  - `pip-audit` finds no known vulnerabilities.
+- **Frontend:**
+  - `tsc --noEmit` and `eslint` are clean.
+  - `vitest` reports **134 passed** (24 files).
+  - `next build` succeeds.
+  - `npm audit --omit=dev` finds 0 vulnerabilities. The full audit shows 2 moderate advisories, both dev-only (see `docs/security.md`).
+- **Playwright** against `next start` (production build) and the dev Django server: **40/40 passed** in 1.4 min, desktop and mobile Chromium, including every axe and CSP check. E2E data was then purged from the dev database.
+  - An earlier run against `next dev` took 3.3 h and failed 16 tests on navigation timeouts while routes compiled. It passed unchanged on the production build, so the README now says to use one.
+- **Restore drill** (`DATABASE_URL` mode, details in `docs/deployment.md#backups`): two backups were taken and pruned to one. The dump was restored into a fresh scratch database and then again on top of it. All 61 tables had the same row counts as the source, `migrate --check` was clean, and the abort path exited 1. The scratch database was dropped afterwards.
+
+### Not verified
+
+- **Infrastructure:** Docker Compose, Nginx, Gunicorn, Celery, Redis and the GitHub Actions workflow have still never run (no Docker locally). The compose mode of the backup scripts is untested.
+- **Load testing:** none has been run. It needs the target VPS (the staging checklist includes it).
+- **External services:** real email, Khalti, eSewa, Meet and Zoom (as in M5 and M6).
+- **Accessibility:** only automated checks have run. A manual keyboard and screen-reader pass has not been done.
+
+### Known gaps / follow-ups
+
+- There is no caching layer for public CMS and catalog reads yet. Pages render dynamically (ADR-006 and ADR-044), and the constant query counts keep that cheap; add per-view caching if the load test calls for it.
+- Index review for hot filters has been done only through the query-count work. Run `EXPLAIN ANALYZE` on staging-sized data.
+- There is no error-reporting service (Sentry or similar) yet. If one is added, PII must stay off.
+- The staging launch: run the staging validation checklist and the launch-readiness review in `docs/deployment.md`.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.
-2. Next up is **M7: production readiness**:
-   - Security: a Content-Security-Policy (Next.js and Django), a permission audit of every admin endpoint, `manage.py check --deploy` under production settings, and dependency scanning (`pip-audit`, `npm audit`).
-   - Observability: structured JSON logging, request IDs, error reporting hooks, and the health endpoints wired into monitoring.
-   - Performance: query counts on list endpoints (`assertNumQueries`), indexes for the hot filters, caching for public CMS and catalog reads.
-   - Accessibility: an axe pass in Playwright on the main public, dashboard and admin pages.
-   - CI: make `.github/workflows` run everything in this file's verification lists, including migrations and the production build.
-   - Backups: run `infrastructure/scripts` backup and restore against a scratch database and record the result.
-   - Launch-readiness review in `docs/deployment.md`.
+2. All seven milestones are done locally. Next is the **staging launch**, which needs a server:
+   - Provision a VPS and work through the "Staging validation checklist" and the "Launch-readiness review" in `docs/deployment.md`, including the compose-mode restore drill and a load test.
+   - Activate one payment gateway with merchant test credentials, then configure SMTP.
+   - The owner replaces the demo content and legal pages.
+   - After launch, see the deferred items: provider refund APIs, Meet/Zoom OAuth, a cart and bundles, email preferences, a Devanagari certificate font, and caching if the load test needs it.
 3. Local dev:
    - `python manage.py seed_cms` and `python manage.py seed_catalog --instructor <email>`.
    - E2E needs `E2E_EDITOR_EMAIL`, `E2E_EDITOR_PASSWORD`, `E2E_INSTRUCTOR_EMAIL` and `E2E_INSTRUCTOR_PASSWORD`. The editor needs the `content_editor` and `exam_coordinator` roles; the instructor needs `instructor`.
    - Start Django with `DJANGO_E2E_RELAXED_THROTTLES=true` for full E2E runs. The commerce spec also needs `PAYMENTS_ENABLE_SANDBOX=true` and any `PAYMENTS_SANDBOX_SECRET` (`dev.py` enables the sandbox by default).
+   - Run E2E against `npm run build && npm run start`, not `next dev`.
    - E2E specs create `e2e-` courses and learners in the dev database; delete them afterwards (Refund and Payment rows first, since they PROTECT orders).
 4. Keep the verification bar: tests and builds must actually run before anything is marked done.

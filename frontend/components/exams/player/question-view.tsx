@@ -73,7 +73,7 @@ export function QuestionView({ question, number, total, selected, flagged, negat
                     className={cn(
                       "flex h-7 w-7 shrink-0 items-center justify-center border text-sm font-semibold",
                       multiple ? "rounded-md" : "rounded-full",
-                      checked ? "border-teal bg-teal text-white" : "border-line text-muted",
+                      checked ? "border-teal-700 bg-teal-700 text-white" : "border-line text-muted",
                     )}
                   >
                     {optionLetter(i)}

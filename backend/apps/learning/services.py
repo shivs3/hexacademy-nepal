@@ -16,7 +16,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.catalog import policies
 from apps.catalog.models import Course, Lesson
-from apps.catalog.services import ordered_lessons
+from apps.catalog.services import LESSON_ORDER, ordered_lessons
 from common.exceptions import ConflictError, DomainError
 
 from .models import Enrollment, LessonProgress
@@ -184,13 +184,36 @@ def record_progress(enrollment: Enrollment, lesson: Lesson, *, completed: bool |
 
 
 def progress_summary(enrollment: Enrollment) -> dict:
-    lessons = list(ordered_lessons(enrollment.course))
-    completed = completed_lesson_ids(enrollment) & {lesson.pk for lesson in lessons}
-    next_lesson = next((lesson for lesson in lessons if lesson.pk not in completed), None)
-    total = len(lessons)
-    return {
-        "total_lessons": total,
-        "completed_lessons": len(completed),
-        "percent": round(100 * len(completed) / total) if total else 0,
-        "next_lesson_id": next_lesson.pk if next_lesson else None,
-    }
+    return progress_summaries([enrollment])[enrollment.pk]
+
+
+def progress_summaries(enrollments) -> dict[int, dict]:
+    """Progress for many enrollments in two queries, keyed by enrollment id."""
+    enrollments = list(enrollments)
+    lessons_by_course: dict[int, list[int]] = {}
+    lesson_rows = (
+        Lesson.objects.filter(course_id__in={e.course_id for e in enrollments}, is_published=True)
+        .order_by(*LESSON_ORDER)
+        .values_list("course_id", "pk")
+    )
+    for course_id, lesson_id in lesson_rows:
+        lessons_by_course.setdefault(course_id, []).append(lesson_id)
+    completed_by_enrollment: dict[int, set[int]] = {}
+    progress_rows = LessonProgress.objects.filter(enrollment__in=enrollments, completed_at__isnull=False).values_list(
+        "enrollment_id", "lesson_id"
+    )
+    for enrollment_id, lesson_id in progress_rows:
+        completed_by_enrollment.setdefault(enrollment_id, set()).add(lesson_id)
+
+    summaries = {}
+    for enrollment in enrollments:
+        lessons = lessons_by_course.get(enrollment.course_id, [])
+        completed = completed_by_enrollment.get(enrollment.pk, set()) & set(lessons)
+        total = len(lessons)
+        summaries[enrollment.pk] = {
+            "total_lessons": total,
+            "completed_lessons": len(completed),
+            "percent": round(100 * len(completed) / total) if total else 0,
+            "next_lesson_id": next((pk for pk in lessons if pk not in completed), None),
+        }
+    return summaries

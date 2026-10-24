@@ -50,8 +50,13 @@ cd backend
 
 cd frontend
 npm run lint && npm run typecheck && npm test && npm run build
-npm run e2e                      # needs both dev servers running; uses the dev database
+npm run e2e                      # needs both servers running; uses the dev database
 ```
+
+Run the end-to-end suite against a production build (`npm run build && npm run start`). Under `next dev`, routes
+compile on first request and the suite's navigation timeouts fail spuriously. `e2e/a11y.spec.ts` runs axe (WCAG 2.1
+A/AA) on public, dashboard and admin pages, and the exams spec runs it inside the exam player; failures list the rule
+and the offending elements. `e2e/csp.spec.ts` fails on any Content-Security-Policy violation.
 
 The CMS and learning end-to-end tests are skipped unless `E2E_EDITOR_EMAIL` and `E2E_EDITOR_PASSWORD` name a staff
 account with the `content_editor` role (`python manage.py grant_role <email> --role content_editor`). The learning test
@@ -63,6 +68,9 @@ The commerce test buys a course through the built-in sandbox gateway, which deve
 (`PAYMENTS_ENABLE_SANDBOX`); it skips itself when `/api/v1/payments/methods/` reports `sandbox: false`.
 The live-classes test signs in as the instructor too, so it also needs `E2E_INSTRUCTOR_PASSWORD`. The certificates test
 uses the editor (who needs the `content_editor` role, which can manage certificates) and the instructor email.
+
+Backups: `infrastructure/scripts/backup.sh` and `restore.sh` (compose by default, or set `DATABASE_URL`); see
+[docs/deployment.md](docs/deployment.md#backups).
 
 Demo content, clearly labelled as such: `python manage.py seed_cms` (pages, menus, settings) and
 `python manage.py seed_catalog --instructor <email>` (two demo courses; without `--instructor` they stay drafts).

@@ -48,8 +48,14 @@ def attempts_used(user, exam: Exam) -> int:
     return ExamAttempt.objects.filter(exam=exam, user=user).count()
 
 
-def eligibility(user, exam: Exam, *, now=None) -> tuple[bool, str]:
-    """(allowed, reason). Reasons: unavailable, not_open, closed, not_enrolled, no_attempts_left."""
+def eligibility(
+    user, exam: Exam, *, now=None, enrolled: bool | None = None, used: int | None = None
+) -> tuple[bool, str]:
+    """(allowed, reason). Reasons: unavailable, not_open, closed, not_enrolled, no_attempts_left.
+
+    List views may pass `enrolled` and `used` when they have already loaded
+    them for every row; otherwise each is queried here.
+    """
     now = now or timezone.now()
     if exam.status == Exam.Status.DRAFT:
         return False, "unavailable"
@@ -57,9 +63,12 @@ def eligibility(user, exam: Exam, *, now=None) -> tuple[bool, str]:
         return False, "closed"
     if exam.opens_at and now < exam.opens_at:
         return False, "not_open"
-    if exam.course_id and active_enrollment(user, exam.course) is None:
-        return False, "not_enrolled"
-    if exam.max_attempts is not None and attempts_used(user, exam) >= exam.max_attempts:
+    if exam.course_id:
+        if enrolled is None:
+            enrolled = active_enrollment(user, exam.course) is not None
+        if not enrolled:
+            return False, "not_enrolled"
+    if exam.max_attempts is not None and (attempts_used(user, exam) if used is None else used) >= exam.max_attempts:
         return False, "no_attempts_left"
     return True, ""
 

@@ -15,6 +15,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -47,6 +48,23 @@ from .models import Exam, ExamAttempt, Question, Subject, Topic
 StaffPanel = HasPerm("accounts.access_admin_panel")
 
 
+def _policy(check, message: str) -> type[BasePermission]:
+    """Runs an assessments policy before any lookup or validation, so other roles get a plain 403."""
+
+    class _Policy(BasePermission):
+        def has_permission(self, request, view):
+            if not check(request.user):
+                raise PermissionDenied(message)
+            return True
+
+    return _Policy
+
+
+OpensBank = _policy(policies.can_open_bank, "You cannot open the question bank.")
+ManagesBank = _policy(policies.can_manage_bank, "Only question-bank managers can change topics.")
+OpensExams = _policy(policies.can_open_exams, "You cannot open exams.")
+
+
 def _require(allowed: bool, message="You do not have permission to change this."):
     if not allowed:
         raise PermissionDenied(message)
@@ -59,7 +77,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
     """Readable by everyone who can open the question bank; changed by bank managers."""
 
     serializer_class = SubjectSerializer
-    permission_classes = [StaffPanel]
+    permission_classes = [StaffPanel, OpensBank]
     pagination_class = None
     filter_backends: list = []
 
@@ -92,7 +110,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
 
 class TopicViewSet(mixins.CreateModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     serializer_class = TopicSerializer
-    permission_classes = [StaffPanel]
+    permission_classes = [StaffPanel, ManagesBank]
     filter_backends: list = []
 
     def get_queryset(self):
@@ -122,7 +140,7 @@ BANK_FILTERS = [
 
 @extend_schema(parameters=BANK_FILTERS)
 class QuestionViewSet(viewsets.ModelViewSet):
-    permission_classes = [StaffPanel]
+    permission_classes = [StaffPanel, OpensBank]
     filter_backends: list = []
     http_method_names = ["get", "post", "patch", "delete"]
 
@@ -225,7 +243,7 @@ def annotated_exams(qs):
     ]
 )
 class ExamViewSet(viewsets.ModelViewSet):
-    permission_classes = [StaffPanel]
+    permission_classes = [StaffPanel, OpensExams]
     filter_backends: list = []
     http_method_names = ["get", "post", "patch", "put", "delete"]
 
@@ -372,7 +390,7 @@ class ExamViewSet(viewsets.ModelViewSet):
 class ExamCourseOptionsView(APIView):
     """Courses an exam can be attached to by this user (all for exam managers)."""
 
-    permission_classes = [StaffPanel]
+    permission_classes = [StaffPanel, OpensExams]
 
     @extend_schema(
         responses={

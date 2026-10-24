@@ -111,14 +111,45 @@ docker image prune -f
 
 ## Backups
 
-- Database: `infrastructure/scripts/backup.sh` writes a `pg_dump` custom-format archive to `./backups/` and keeps the newest 14. Run it daily from cron, then copy the files off-host (for example `rclone copy backups r2:hexacademy-backups`).
-- Restore: `infrastructure/scripts/restore.sh <file>`. It asks for confirmation, stops the app containers, restores in a single transaction and re-runs migrations. **Test restores on staging monthly.**
+- Database: `infrastructure/scripts/backup.sh [dir]` writes a `pg_dump` custom-format archive (default `./backups/`, directory mode 700, files 600), checks that its table of contents reads back, and keeps the newest `BACKUP_KEEP` (default 14). Run it daily from cron, then copy the files off-host (for example `rclone copy backups r2:hexacademy-backups`, to a private bucket).
+  - Default mode: dumps the compose `postgres` service.
+  - Managed PostgreSQL: set `DATABASE_URL` and the host's `pg_dump` is used instead (install the client matching the server's major version). Keep the password in `~/.pgpass` or `PGPASSFILE`, not in the URL, so it does not appear in the process list.
+- Restore: `infrastructure/scripts/restore.sh <file>`. It asks you to type `restore`, then restores in a single transaction with `--clean --if-exists`.
+  - Default mode: stops the app containers, restores, re-runs migrations and starts them again.
+  - With `DATABASE_URL`: restores into that database only. Stop everything that uses it first, and run `manage.py migrate` afterwards.
+- **Restore drill (verified 2026-10-24, `DATABASE_URL` mode, PostgreSQL 17 locally).** The dev database was backed up twice with `BACKUP_KEEP=1`; only the newer dump was kept, with modes 700/600. It was restored into a new scratch database, then restored again on top of it (the `--clean` path). Row counts matched the source in all 61 tables, `manage.py migrate --check` found nothing to apply, and Django read users and courses from the copy. Any answer other than `restore` aborted with exit 1. The compose mode has **not** been run (no Docker locally); repeat the drill on staging.
+- **Test restores on staging monthly**, into a scratch database, and compare row counts the same way.
 - Media: R2 is durable storage. Turn on bucket versioning or lifecycle rules, and if not using R2, back up the `media` and `private_media` volumes.
 
 ## Monitoring
 
-- Liveness: `/healthz/`. Readiness (DB): `/readyz/`. Point an uptime monitor at `/readyz/`.
-- Logs: `docker compose logs -f backend worker nginx`. Every response carries `X-Request-ID`, and the same ID appears in Django logs and audit entries.
+- Liveness: `/healthz/` (process up, no dependencies). Readiness: `/readyz/` checks the database (`SELECT 1`) and the cache (a set/get/delete of a per-probe key, so Redis is covered in production). It returns `{"status": "ok", "database": "ok", "cache": "ok"}`, or 503 with the failing part marked `error`; failures are logged with their traceback. Point an uptime monitor at `/readyz/`, and use `/healthz/` for container restarts so a database outage doesn't restart every container.
+- Logs: set `LOG_FORMAT=json` in production. Each line is one JSON object with `time` (UTC), `level`, `logger`, `request_id`, `message`, any structured `extra` fields and `exception` when there is one. That suits Loki, Grafana Cloud, Better Stack or `jq`. The application does not log request bodies, passwords, tokens or exam answers. `docker compose logs -f backend worker nginx` still works.
+- Every response carries `X-Request-ID`, and the same ID appears in Django logs and audit entries. Next.js server renders forward it, so one page view can be traced across both services.
+- Error reporting: no third-party service is wired in. If you add Sentry or similar, keep `send_default_pii` off and scrub request bodies.
+
+## Launch-readiness review (2026-10-24)
+
+What has been verified locally, what has not, and what must happen before real learners and payments:
+
+| Area | State | Evidence / remaining step |
+| --- | --- | --- |
+| Automated tests | Ready | 418 backend tests; 134 frontend unit tests; 40 Playwright tests (desktop and mobile Chromium) against a production build |
+| Access control | Ready | Every admin route refuses anonymous callers and students, and roles are kept out of other domains (`backend/tests/test_admin_permissions.py`, built from the URL resolver). Object-level rules have their own tests per app |
+| Exams | Ready | Server-side deadlines, snapshots, row-locked finalisation, no answer keys before release (M4 tests) |
+| Payments | **Blocked on merchant accounts** | Only the local sandbox has been exercised. Khalti and eSewa need credentials and the staging test above |
+| Live classes | Ready (manual links) | Meet/Zoom APIs not integrated; instructors paste links |
+| Email | **Not verified** | Console backend only; configure SMTP with SPF/DKIM/DMARC |
+| Security headers / CSP | Ready | `check --deploy` clean under production settings; nonce CSP with an E2E violation check |
+| Dependencies | Ready | `pip-audit`: none. `npm audit --omit=dev`: none. Two moderate advisories remain in dev-only tooling (`postcss-selector-parser` via `@tailwindcss/typography`, build-time only) |
+| Accessibility | Ready (automated) | axe WCAG 2.1 A/AA passes on public, dashboard, admin and exam-player pages; a manual keyboard and screen-reader pass is still recommended |
+| Performance | Ready (queries) | List endpoints use a constant number of queries regardless of row count (`assert_constant_queries`). No load test has been run |
+| Backups | Partly verified | Restore drill passed in `DATABASE_URL` mode; repeat in compose mode on staging |
+| Infrastructure | **Not run** | Docker Compose, Nginx, Gunicorn, Celery, Redis and CI have never run on this machine. The staging checklist below is mandatory |
+| Content | Needs the owner | Demo CMS and catalog content is labelled as demo; replace it, and fill the legal pages, before launch |
+| Certificates | Caveat | PDFs cannot draw Devanagari names until a font is bundled (see Certificates) |
+
+Launch only when the staging checklist passes, at least one gateway passes its staging test, email delivers, and the demo content is replaced.
 
 ## Staging validation checklist (before first production launch)
 
@@ -128,7 +159,10 @@ docker image prune -f
 - [ ] Register, log in and log out work over HTTPS. Cookies are `Secure` and `HttpOnly` (session)
 - [ ] `/django-admin/` loads with styles (WhiteNoise static)
 - [ ] Postgres and Redis ports are not reachable from outside (`nmap` from another host)
-- [ ] A backup + restore round trip works on staging
+- [ ] A backup + restore round trip works on staging in compose mode (and in `DATABASE_URL` mode if the database is managed)
+- [ ] `/readyz/` returns 503 when Redis is stopped, and 200 again when it is back
+- [ ] Logs are JSON (`LOG_FORMAT=json`) and reach the log store with request IDs
+- [ ] A short load test (for example k6 against the catalog, a course page and an exam attempt) shows acceptable latency on the chosen VPS size
 - [ ] The Celery worker and beat are running (`docker compose logs worker beat`)
 - [ ] The payment staging test above passes with each provider's test credentials, then live keys are swapped in
 - [ ] A test email arrives (verify address, then a class reminder) with SPF/DKIM passing

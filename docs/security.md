@@ -55,6 +55,16 @@
 ## Dependency scanning
 
 - CI runs `pip-audit -r requirements.txt` and `npm audit --omit=dev --audit-level=high`, and `manage.py check --deploy --fail-level WARNING` under production settings. HSTS preload (W021) is silenced only while `DJANGO_HSTS_PRELOAD` is off.
+- Known and accepted (2026-10-24): two moderate advisories in `postcss-selector-parser` (via `@tailwindcss/typography`). It runs only at build time on our own CSS, never on user input or in the browser. Upgrade when the plugin ships a fixed dependency.
+
+## Authorisation audit (M7)
+
+- `backend/tests/test_admin_permissions.py` enumerates every admin API route from the URL resolver and checks that anonymous callers, students and roles from other domains are refused (401/403/405) for every method before any lookup or validation (ADR-048). It specifically covers: finance never reaching the question bank, exams or results; content editors and instructors never reaching commerce; and only super admins and support reaching account administration.
+- Assessments viewsets now enforce their open/manage policies as DRF permission classes, so a POST from an unauthorised staff role gets 403 instead of reaching serializer validation.
+
+## Logging
+
+- `LOG_FORMAT=json` writes one JSON object per line with the request ID. The application logs no request bodies, passwords, session or CSRF tokens, payment secrets or exam answers. Audit entries are stored in the database (`apps/audit`), not only in logs.
 
 ## Infrastructure
 

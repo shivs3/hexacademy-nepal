@@ -95,3 +95,29 @@ def make_course(db):
         return course
 
     return _make
+
+
+@pytest.fixture
+def assert_constant_queries():
+    """Fails when a GET's query count grows with the number of rows (N+1).
+
+    `build(n)` adds n rows; the endpoint is measured after 2 and after 8.
+    """
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    def count(client, url) -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            res = client.get(url)
+        assert res.status_code == 200, res.content
+        return len(ctx.captured_queries)
+
+    def _assert(build, client, url, small=2, large=8):
+        build(small)
+        client.get(url)  # warm per-process caches (content types, permissions)
+        first = count(client, url)
+        build(large - small)
+        second = count(client, url)
+        assert second == first, f"{url}: {first} queries for {small} rows, {second} for {large}"
+
+    return _assert

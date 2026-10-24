@@ -306,9 +306,14 @@ LOGGING = {
     "filters": {"request_id": {"()": "common.middleware.RequestIdLogFilter"}},
     "formatters": {
         "standard": {"format": "%(asctime)s %(levelname)s [%(name)s] [req:%(request_id)s] %(message)s"},
+        "json": {"()": "common.logging.JsonFormatter"},
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "standard", "filters": ["request_id"]},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json" if env("LOG_FORMAT", default="standard") == "json" else "standard",
+            "filters": ["request_id"],
+        },
     },
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
     "loggers": {

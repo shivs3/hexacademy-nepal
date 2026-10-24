@@ -43,7 +43,9 @@ class MyEnrollmentSerializer(serializers.ModelSerializer):
     def get_progress(self, obj):
         from .services import progress_summary
 
-        return progress_summary(obj)
+        # List views pass every row's summary in one batch (progress_summaries).
+        batch = self.context.get("progress")
+        return batch[obj.pk] if batch and obj.pk in batch else progress_summary(obj)
 
 
 class PlayerLessonSerializer(serializers.Serializer):

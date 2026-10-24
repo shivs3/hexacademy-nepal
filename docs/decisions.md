@@ -236,3 +236,22 @@ Short records of choices that are expensive to reverse. Newest last.
 **Decision:** Next.js server renders call Django directly over the internal network. `lib/api/server.ts` forwards the `X-Forwarded-For` that Nginx set (a single overwritten client IP, validated as an IP) and `X-Request-ID`. Django keeps trusting exactly one hop.
 **Consequences:** Anonymous rate limits apply per visitor. Without this, all anonymous page renders shared the frontend container's address, and each render makes several API calls, so modest anonymous traffic would exhaust the 120/min limit and turn pages into errors for everyone (found when the E2E suite ran against a production build). Audit logs record the visitor's address for server-side calls. In development without Nginx, renders still share one address, so `DJANGO_E2E_RELAXED_THROTTLES` also raises the anonymous and user limits.
 
+## ADR-046: Text and fills use a darkened accent; the logo keeps the brand teal
+
+**Decision:** The brand teal (#0A8BA7) is 3.99:1 on white, below the 4.5:1 WCAG AA needs for normal text. Buttons, the announcement bar, accent sections, avatars and the exam player's answered and selected states use `teal-700` (the accent mixed 80% with black in oklab, 6.60:1), with `teal-800` for hover. Icons and focus rings keep the brand teal, since non-text elements need 3:1. The wordmark keeps the exact brand colour, because WCAG 1.4.3 exempts logotypes, and axe excludes `[data-brand-logo]`.
+**Consequences:** The palette still reads as Hexacademy teal and the axe checks pass. Admins can change the accent, but the CMS only accepts accents of at least 3:1, and every such colour darkens to at least 5.16:1 (checked numerically across the whole accepted range), so a CMS edit cannot break text contrast.
+
+## ADR-047: List endpoints are tested for constant query counts
+
+**Decision:** The `assert_constant_queries` fixture loads a list with 2 rows and with 8 rows and requires the same number of queries. Every learner, staff and public list endpoint with per-row data has such a test. Fixes keep the existing serializer shapes: prefetches, annotations, and bulk helpers such as `progress_summaries()` and `with_pool_totals()` that serializers read from context when present.
+**Consequences:** N+1 regressions fail CI instead of appearing as slow pages. Four were found and fixed this way (enrollments, the exam catalog, admin sessions and batches). The tests count queries, not time, so they say nothing about slow single queries or load.
+
+## ADR-048: Admin permissions are audited from the URL resolver
+
+**Decision:** `tests/test_admin_permissions.py` walks every registered `/api/v1/…/admin/` route and calls each with every method, as an anonymous user, a student, and roles from unrelated domains. Each call must be refused with 401, 403 or 405 before any lookup or validation. Viewsets that decided access in `get_queryset` (which DRF does not call on create) now also run the policy as a permission class.
+**Consequences:** A new admin endpoint is covered without anyone remembering to add it. Unauthorised roles get a plain 403 rather than validation errors. Object-level rules (which course an instructor may edit) are still tested per app, because they depend on data the audit does not create.
+
+## ADR-049: Backups run against a compose service or a database URL
+
+**Decision:** `backup.sh` and `restore.sh` keep the compose mode and add a `DATABASE_URL` mode that uses the host's `pg_dump` and `pg_restore`, because the recommended production database is managed and has no compose service.
+**Consequences:** The same scripts work for both deployments, and the restore drill could run locally. In URL mode the restore script cannot stop the application or run migrations; it says so, and the deployment guide lists the steps.

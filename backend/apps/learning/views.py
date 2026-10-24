@@ -65,6 +65,11 @@ class MyEnrollmentsView(generics.ListAPIView):
             .order_by(F("last_accessed_at").desc(nulls_last=True), "-enrolled_at")
         )
 
+    def get_serializer(self, *args, **kwargs):
+        if args and kwargs.get("many"):
+            kwargs["context"] = {**self.get_serializer_context(), "progress": services.progress_summaries(args[0])}
+        return super().get_serializer(*args, **kwargs)
+
 
 class EnrollView(APIView):
     """Self-enrollment in a published free course. Paid courses are 402."""

@@ -39,7 +39,7 @@ export function QuestionNavigator({ questionIds, answers, current, minIndex, max
                 aria-label={`Question ${i + 1}${isAnswered ? ", answered" : ", not answered"}${a?.flagged ? ", flagged" : ""}`}
                 className={cn(
                   "relative flex h-10 w-full items-center justify-center rounded-md border text-sm font-medium tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                  isAnswered ? "border-teal bg-teal text-white" : "border-line bg-white text-navy hover:border-teal",
+                  isAnswered ? "border-teal-700 bg-teal-700 text-white" : "border-line bg-white text-navy hover:border-teal",
                   i === current && "ring-2 ring-navy ring-offset-1",
                 )}
               >
@@ -52,7 +52,7 @@ export function QuestionNavigator({ questionIds, answers, current, minIndex, max
       </ol>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-hidden="true">
         <li className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-teal" /> Answered
+          <span className="h-3 w-3 rounded-sm bg-teal-700" /> Answered
         </li>
         <li className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm border border-line bg-white" /> Not answered

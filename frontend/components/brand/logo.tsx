@@ -19,7 +19,7 @@ export function Logo({
   inverted?: boolean;
 }) {
   return (
-    <Link href="/" className={cn("inline-flex items-center gap-2.5", className)} aria-label={`${siteName} home`}>
+    <Link href="/" className={cn("inline-flex items-center gap-2.5", className)} aria-label={`${siteName} home`} data-brand-logo>
       {logoUrl ? (
         <Image src={logoUrl} alt="" width={140} height={36} className="h-9 w-auto" unoptimized />
       ) : (

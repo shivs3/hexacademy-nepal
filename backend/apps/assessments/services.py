@@ -9,7 +9,7 @@ different client.
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, OuterRef, Subquery, Sum
 from django.utils import timezone
 
 from apps.audit import services as audit
@@ -160,9 +160,26 @@ SCORING_FIELDS = (
 )  # fmt: skip
 
 
+def with_pool_totals(exams):
+    """Annotates what pool_summary and total_marks need, for list views."""
+    first = ExamQuestion.objects.filter(exam=OuterRef("pk")).order_by("position", "id").values("marks")[:1]
+    return exams.annotate(
+        pool_n=Count("exam_questions"),
+        pool_total=Sum("exam_questions__marks"),
+        pool_distinct_marks=Count("exam_questions__marks", distinct=True),
+        pool_first_marks=Subquery(first),
+    )
+
+
 def pool_summary(exam: Exam) -> dict:
-    agg = exam.exam_questions.aggregate(n=Count("pk"), total=Sum("marks"), distinct_marks=Count("marks", distinct=True))
-    return {"pool_size": agg["n"], "pool_marks": agg["total"] or Decimal("0"), "distinct_marks": agg["distinct_marks"]}
+    if hasattr(exam, "pool_n"):  # annotated by with_pool_totals
+        n, total, distinct = exam.pool_n, exam.pool_total, exam.pool_distinct_marks
+    else:
+        agg = exam.exam_questions.aggregate(
+            n=Count("pk"), total=Sum("marks"), distinct_marks=Count("marks", distinct=True)
+        )
+        n, total, distinct = agg["n"], agg["total"], agg["distinct_marks"]
+    return {"pool_size": n, "pool_marks": total or Decimal("0"), "distinct_marks": distinct}
 
 
 def drawn_count(exam: Exam, pool_size: int) -> int:
@@ -177,8 +194,11 @@ def total_marks(exam: Exam) -> Decimal:
     n = drawn_count(exam, summary["pool_size"])
     if n == summary["pool_size"]:
         return summary["pool_marks"]
-    first = exam.exam_questions.values_list("marks", flat=True).first() or Decimal("0")
-    return first * n
+    if hasattr(exam, "pool_first_marks"):
+        first = exam.pool_first_marks
+    else:
+        first = exam.exam_questions.values_list("marks", flat=True).first()
+    return (first or Decimal("0")) * n
 
 
 def publish_problems(exam: Exam) -> list[str]:

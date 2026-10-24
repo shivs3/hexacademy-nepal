@@ -11,12 +11,12 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-teal text-white hover:bg-teal-700",
+        primary: "bg-teal-700 text-white hover:bg-teal-800",
         secondary: "bg-navy text-white hover:bg-navy-900",
         outline: "border border-line bg-white text-navy hover:bg-teal-50 hover:border-teal/40",
         ghost: "text-navy hover:bg-teal-50",
         danger: "bg-danger text-white hover:opacity-90",
-        link: "text-teal underline-offset-4 hover:underline px-0",
+        link: "text-teal-700 underline-offset-4 hover:underline px-0",
       },
       size: {
         sm: "h-8 px-3 text-sm",

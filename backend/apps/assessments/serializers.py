@@ -72,6 +72,8 @@ class LearnerExamSerializer(serializers.ModelSerializer):
         ]  # fmt: skip
 
     def _mine(self, obj):
+        if hasattr(obj, "my_attempts"):  # prefetched by the list view
+            return obj.my_attempts
         cache = self.context.setdefault("_attempts", {})
         if obj.pk not in cache:
             user = self.context["request"].user
@@ -82,7 +84,7 @@ class LearnerExamSerializer(serializers.ModelSerializer):
         return f"{services.total_marks(obj):.2f}"
 
     def get_question_total(self, obj) -> int:
-        return services.drawn_count(obj, obj.exam_questions.count())
+        return services.drawn_count(obj, services.pool_summary(obj)["pool_size"])
 
     @extend_schema_field(
         serializers.ChoiceField(
@@ -92,7 +94,13 @@ class LearnerExamSerializer(serializers.ModelSerializer):
     def get_availability(self, obj):
         if self.get_open_attempt_id(obj):
             return "in_progress"
-        allowed, reason = attempts.eligibility(self.context["request"].user, obj)
+        enrolled_ids = self.context.get("enrolled_course_ids")
+        allowed, reason = attempts.eligibility(
+            self.context["request"].user,
+            obj,
+            enrolled=None if enrolled_ids is None else obj.course_id in enrolled_ids,
+            used=len(obj.my_attempts) if hasattr(obj, "my_attempts") else None,
+        )
         return "available" if allowed else reason
 
     def get_attempts_used(self, obj) -> int:
