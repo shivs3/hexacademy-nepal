@@ -438,6 +438,14 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Section B (the programme-specific part) of the IOE MSc syllabus. No reliable current source was found, so none is seeded.
 - The exam pattern has not been checked against the official IOE notice. The seeded content tells learners to check it themselves.
 
+## Fix: dashboard crash for learners with exam results (2026-10-30)
+
+- **Symptom:** after sign-in, /dashboard and /dashboard/exams showed "This page couldn't load" for any learner with a graded attempt.
+- **Cause:** `formatDate` in `frontend/lib/utils.ts` always added `dateStyle: "medium"`. Intl throws `TypeError: Invalid option` when `dateStyle` is mixed with fields such as `day`/`month`, and the attempt-history chart passes those fields. The admin revenue report had the same problem.
+- **Fix:** the default `dateStyle` now applies only when the caller asks for no individual fields.
+- **Tests:** a vitest regression test (it fails without the fix), and the exam E2E now opens /dashboard and /dashboard/exams after grading and asserts there are no page errors. vitest 135, tsc, eslint and the build pass; Playwright 40/40.
+- E2E-run records and the debug account were purged from the dev database. The e2e-editor and e2e-instructor accounts and all demo data were kept.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

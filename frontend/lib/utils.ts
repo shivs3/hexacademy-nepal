@@ -7,9 +7,15 @@ export function cn(...inputs: ClassValue[]) {
 
 const NEPAL_TZ = "Asia/Kathmandu";
 
+const DATE_FIELDS = ["weekday", "era", "year", "month", "day", "hour", "minute", "second"] as const;
+
 export function formatDate(iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = {}): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: NEPAL_TZ, ...opts }).format(new Date(iso));
+  // Intl throws a TypeError when dateStyle is combined with individual fields, so the
+  // default style applies only when the caller asks for none.
+  const custom = DATE_FIELDS.some((field) => field in opts) || "timeStyle" in opts;
+  const defaults: Intl.DateTimeFormatOptions = custom ? {} : { dateStyle: "medium" };
+  return new Intl.DateTimeFormat("en-GB", { ...defaults, timeZone: NEPAL_TZ, ...opts }).format(new Date(iso));
 }
 
 export function formatDateTime(iso: string | null | undefined): string {

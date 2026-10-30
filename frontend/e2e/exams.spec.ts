@@ -138,6 +138,15 @@ test("a coordinator publishes an exam and a learner's attempt is graded by the s
   });
   expect([404, 409]).toContain(late.status());
 
+  // The dashboard renders with a graded attempt (its history chart once crashed the page).
+  const pageErrors: string[] = [];
+  student.on("pageerror", (e) => pageErrors.push(e.message));
+  await student.goto("/dashboard");
+  await expect(student.getByRole("heading", { level: 1 })).toContainText("Hello");
+  await student.goto("/dashboard/exams");
+  await expect(student.getByRole("heading", { name: "Exams", level: 1 })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+
   // Another user cannot read this attempt.
   const stranger = await browser.newContext();
   const strangerPage = await stranger.newPage();
