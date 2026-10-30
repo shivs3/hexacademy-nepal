@@ -446,6 +446,14 @@ Update this file at the end of every milestone. Only record what was actually ex
 - **Tests:** a vitest regression test (it fails without the fix), and the exam E2E now opens /dashboard and /dashboard/exams after grading and asserts there are no page errors. vitest 135, tsc, eslint and the build pass; Playwright 40/40.
 - E2E-run records and the debug account were purged from the dev database. The e2e-editor and e2e-instructor accounts and all demo data were kept.
 
+## Staging deployment on the shared VPS (2026-10-30)
+
+- Live at http://80.241.208.65:8090 (HTTP only, no domain yet). Layout, redeploy steps and what is still missing are in [deployment.md](deployment.md#shared-vps-staging-deployed-2026-10-30).
+- New setting `DJANGO_SECURE_COOKIES` (default true; false only allowed with the SSL redirect off), covered by `backend/tests/test_prod_settings.py`. Backend tests: 435 pass.
+- Verified on the server: migrations, collectstatic, `check --deploy` (only the four HTTP-only warnings), demo seed, all five units active, `/readyz/` 200. A Playwright smoke run against the server passed on desktop and mobile: learner sign-up, dashboard, catalog, course page, exams page with no page errors, and admin sign-in to /admin/cms/pages. The smoke accounts were deleted afterwards.
+- The other sites on the server still respond. The only shared-service change was a graceful Nginx reload after `nginx -t`.
+- Next: point the domain at the server, add HTTPS and turn the secure flags back on; configure SMTP, R2 and backups.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

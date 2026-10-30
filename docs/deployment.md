@@ -20,6 +20,45 @@ A single VPS (2 vCPU / 4 GB RAM is enough to start) running Docker Compose, behi
    `docker compose run --rm backend python manage.py grant_role you@example.com --role super_admin`.
 7. Check `curl -fsS https://hexacademynepal.com/readyz/`.
 
+## Shared-VPS staging (deployed 2026-10-30)
+
+A staging copy runs without Docker on a VPS shared with other sites, at **http://80.241.208.65:8090**. Everything it uses is separate from the other apps:
+
+| Piece | Where |
+| --- | --- |
+| Code | `/var/www/SHIV/hexacademy-nepal`, owned by the `hexacademy` system user (no login shell) |
+| Nginx | `/etc/nginx/sites-available/hexacademy-nepal`, on port 8090 only; zones and upstreams are prefixed `hexacademy_` |
+| Django (Gunicorn) | `hexacademy-backend.service` on `127.0.0.1:8050` |
+| Next.js | `hexacademy-frontend.service` on `127.0.0.1:3050`, using a private Node 24 in `.node/` (jsdom needs Node 22.22 or newer; the system Node 20 serves other sites) |
+| Celery | `hexacademy-celery-worker.service` and `hexacademy-celery-beat.service` |
+| Redis | `hexacademy-redis.service`, a Docker container on `127.0.0.1:6390` |
+| PostgreSQL | database and role `hexacademy` on the shared local PostgreSQL 16 |
+| Secrets | `backend/.env` and `frontend/.env.production` (mode 600, generated on the server) |
+| Admin login | `/root/hexacademy-admin-credentials.txt` (root only) |
+
+The unit files and Nginx site are in `infrastructure/vps/`. UFW allows 8090/tcp.
+
+**HTTP only.** There is no domain or certificate yet, so `.env` sets `DJANGO_SECURE_SSL_REDIRECT=false` and `DJANGO_SECURE_COOKIES=false`, and `check --deploy` reports the four matching warnings. Passwords travel unencrypted, so use it only for demos and testing. Once `hexacademynepal.com` points at the server, add an HTTPS server block (certbot), set both flags back to `true`, and update `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `FRONTEND_URL` and `NEXT_PUBLIC_SITE_URL` (a frontend rebuild is needed).
+
+**Not set up yet:** SMTP (emails go to the backend log), object storage (media is on local disk), payment gateways, and scheduled database backups.
+
+**Redeploy** (from a clean checkout of `main` on your machine):
+
+```sh
+git archive --format=tar HEAD | ssh root@80.241.208.65 'tar -x -C /var/www/SHIV/hexacademy-nepal && chown -R hexacademy:hexacademy /var/www/SHIV/hexacademy-nepal'
+ssh root@80.241.208.65 'bash -s' <<'EOF'
+set -euo pipefail
+cd /var/www/SHIV/hexacademy-nepal/backend
+sudo -u hexacademy bash -c 'set -a; . ./.env; set +a; .venv/bin/pip install -q -r requirements.txt && .venv/bin/python manage.py migrate --noinput && .venv/bin/python manage.py collectstatic --noinput'
+cd ../frontend
+sudo -u hexacademy -H bash -c 'export PATH=/var/www/SHIV/hexacademy-nepal/.node/bin:$PATH npm_config_cache=/var/www/SHIV/hexacademy-nepal/.npm NEXT_TELEMETRY_DISABLED=1; npm ci --no-audit --no-fund && npm run build && cp -r .next/static .next/standalone/.next/static'
+systemctl restart hexacademy-backend hexacademy-celery-worker hexacademy-celery-beat hexacademy-frontend
+curl -fsS http://127.0.0.1:8050/readyz/ -H 'Host: 80.241.208.65'
+EOF
+```
+
+Logs: `journalctl -u hexacademy-backend -f` (likewise for the other units) and `/var/log/nginx/hexacademy.*.log`.
+
 ## Payments: activating Khalti, eSewa and bank transfer
 
 No production payment credentials are in this repository, and none have been tested yet. Until a gateway is configured it stays hidden from learners, and the settings page in `/admin/commerce/settings` can't switch it on.

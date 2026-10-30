@@ -10,7 +10,8 @@ EnvironmentFile=/var/www/SHIV/hexacademy-nepal/frontend/.env.production
 Environment=NODE_ENV=production
 Environment=PORT=3050
 Environment=HOSTNAME=127.0.0.1
-ExecStart=/usr/bin/node server.js
+# A private Node 24 runtime (jsdom needs >=22.22); the system Node serves other sites.
+ExecStart=/var/www/SHIV/hexacademy-nepal/.node/bin/node server.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
