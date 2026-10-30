@@ -1,0 +1,14 @@
+[Unit]
+Description=Hexacademy Nepal Redis (Docker, localhost:6390 only)
+After=docker.service
+Requires=docker.service
+
+[Service]
+ExecStartPre=-/usr/bin/docker rm -f hexacademy-redis
+ExecStart=/usr/bin/docker run --rm --name hexacademy-redis -p 127.0.0.1:6390:6379 -v hexacademy_redis:/data redis:7.4-alpine redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+ExecStop=/usr/bin/docker stop hexacademy-redis
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

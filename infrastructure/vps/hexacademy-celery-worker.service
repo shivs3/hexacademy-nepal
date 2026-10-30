@@ -1,0 +1,19 @@
+[Unit]
+Description=Hexacademy Nepal Celery worker
+After=network.target postgresql.service hexacademy-redis.service
+Wants=hexacademy-redis.service
+
+[Service]
+User=hexacademy
+Group=hexacademy
+WorkingDirectory=/var/www/SHIV/hexacademy-nepal/backend
+EnvironmentFile=/var/www/SHIV/hexacademy-nepal/backend/.env
+ExecStart=/var/www/SHIV/hexacademy-nepal/backend/.venv/bin/celery -A config worker --loglevel=INFO --concurrency=2
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

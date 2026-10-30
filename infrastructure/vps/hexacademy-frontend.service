@@ -1,0 +1,21 @@
+[Unit]
+Description=Hexacademy Nepal Next.js frontend
+After=network.target hexacademy-backend.service
+
+[Service]
+User=hexacademy
+Group=hexacademy
+WorkingDirectory=/var/www/SHIV/hexacademy-nepal/frontend/.next/standalone
+EnvironmentFile=/var/www/SHIV/hexacademy-nepal/frontend/.env.production
+Environment=NODE_ENV=production
+Environment=PORT=3050
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
