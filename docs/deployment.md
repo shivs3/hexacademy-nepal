@@ -22,12 +22,14 @@ A single VPS (2 vCPU / 4 GB RAM is enough to start) running Docker Compose, behi
 
 ## Shared-VPS staging (deployed 2026-10-30)
 
-A staging copy runs without Docker on a VPS shared with other sites, at **http://80.241.208.65:8090**. Everything it uses is separate from the other apps:
+A staging copy runs without Docker on a VPS shared with other sites, at **https://hexacademynepal.com** (the original `http://80.241.208.65:8090` address now redirects there). Everything it uses is separate from the other apps:
 
 | Piece | Where |
 | --- | --- |
 | Code | `/var/www/SHIV/hexacademy-nepal`, owned by the `hexacademy` system user (no login shell) |
-| Nginx | `/etc/nginx/sites-available/hexacademy-nepal`, on port 8090 only; zones and upstreams are prefixed `hexacademy_` |
+| Nginx | `/etc/nginx/sites-available/hexacademy-nepal`: server blocks for the two `hexacademynepal.com` names on 80/443, plus a redirect on 8090; zones and upstreams are prefixed `hexacademy_` |
+| TLS | Let's Encrypt certificate in `/etc/letsencrypt/live/hexacademynepal.com/`, issued with `certbot certonly --webroot -w /var/www/SHIV/hexacademy-nepal/.acme` and a `systemctl reload nginx` deploy hook; the existing `certbot.timer` renews it |
+| Cloudflare | DNS is proxied; SSL mode "Full". `/etc/nginx/snippets/hexacademy-cloudflare-real-ip.inc` restores visitor IPs from `CF-Connecting-IP` (trusted only from Cloudflare ranges) and is included only in Hexacademy's 443 block |
 | Django (Gunicorn) | `hexacademy-backend.service` on `127.0.0.1:8050` |
 | Next.js | `hexacademy-frontend.service` on `127.0.0.1:3050`, using a private Node 24 in `.node/` (jsdom needs Node 22.22 or newer; the system Node 20 serves other sites) |
 | Celery | `hexacademy-celery-worker.service` and `hexacademy-celery-beat.service` |
@@ -36,9 +38,14 @@ A staging copy runs without Docker on a VPS shared with other sites, at **http:/
 | Secrets | `backend/.env` and `frontend/.env.production` (mode 600, generated on the server) |
 | Admin login | `/root/hexacademy-admin-credentials.txt` (root only) |
 
-The unit files and Nginx site are in `infrastructure/vps/`. UFW allows 8090/tcp.
+The unit files and Nginx site are in `infrastructure/vps/`. UFW allows 8090/tcp (it only redirects now).
 
-**HTTP only.** There is no domain or certificate yet, so `.env` sets `DJANGO_SECURE_SSL_REDIRECT=false` and `DJANGO_SECURE_COOKIES=false`, and `check --deploy` reports the four matching warnings. Passwords travel unencrypted, so use it only for demos and testing. Once `hexacademynepal.com` points at the server, add an HTTPS server block (certbot), set both flags back to `true`, and update `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `FRONTEND_URL` and `NEXT_PUBLIC_SITE_URL` (a frontend rebuild is needed).
+**HTTPS.** `.env` has `DJANGO_SECURE_SSL_REDIRECT=true` and `DJANGO_SECURE_COOKIES=true`, with the domain in `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS` and `FRONTEND_URL`; `NEXT_PUBLIC_SITE_URL` is baked into the frontend build. `check --deploy` reports no issues. Two things this setup depends on:
+
+- **Next's internal calls to Django are plain HTTP.** Nginx sets `X-Forwarded-Proto https`, and `frontend/lib/api/server.ts` passes it on; without it Django would redirect every server render to HTTPS and pages would hang.
+- **Cloudflare must not rewrite pages.** Features such as Email Address Obfuscation change the HTML (the signed-in user's email appears in the app shell), which breaks React hydration and injects a script the CSP blocks. Nginx sends `Cache-Control: no-transform` on Next responses so Cloudflare leaves them alone.
+
+Pages come from Next, so Django's HSTS header only appears on API responses. Turn on HSTS in Cloudflare (SSL/TLS → Edge Certificates) once you're sure the site will stay on HTTPS. With the origin certificate in place, the Cloudflare SSL mode can be raised to "Full (strict)".
 
 **Not set up yet:** SMTP (emails go to the backend log), object storage (media is on local disk), payment gateways, and scheduled database backups.
 
@@ -51,10 +58,16 @@ set -euo pipefail
 cd /var/www/SHIV/hexacademy-nepal/backend
 sudo -u hexacademy bash -c 'set -a; . ./.env; set +a; .venv/bin/pip install -q -r requirements.txt && .venv/bin/python manage.py migrate --noinput && .venv/bin/python manage.py collectstatic --noinput'
 cd ../frontend
-sudo -u hexacademy -H bash -c 'export PATH=/var/www/SHIV/hexacademy-nepal/.node/bin:$PATH npm_config_cache=/var/www/SHIV/hexacademy-nepal/.npm NEXT_TELEMETRY_DISABLED=1; npm ci --no-audit --no-fund && npm run build && cp -r .next/static .next/standalone/.next/static'
+sudo -u hexacademy -H bash -c 'export PATH=/var/www/SHIV/hexacademy-nepal/.node/bin:$PATH npm_config_cache=/var/www/SHIV/hexacademy-nepal/.npm NEXT_TELEMETRY_DISABLED=1; npm ci --no-audit --no-fund && npm run build && rm -rf .next/standalone/.next/static && cp -r .next/static .next/standalone/.next/static'
 systemctl restart hexacademy-backend hexacademy-celery-worker hexacademy-celery-beat hexacademy-frontend
-curl -fsS http://127.0.0.1:8050/readyz/ -H 'Host: 80.241.208.65'
+curl -fsS http://127.0.0.1:8050/readyz/ -H 'Host: hexacademynepal.com' -H 'X-Forwarded-Proto: https'
 EOF
+```
+
+If `infrastructure/vps/nginx-hexacademy.conf` changed, install it with a test and roll back on failure:
+
+```sh
+ssh root@80.241.208.65 'cp /etc/nginx/sites-available/hexacademy-nepal /root/hexacademy-nginx.bak && cp /var/www/SHIV/hexacademy-nepal/infrastructure/vps/nginx-hexacademy.conf /etc/nginx/sites-available/hexacademy-nepal && if nginx -t; then systemctl reload nginx; else cp /root/hexacademy-nginx.bak /etc/nginx/sites-available/hexacademy-nepal; fi'
 ```
 
 Logs: `journalctl -u hexacademy-backend -f` (likewise for the other units) and `/var/log/nginx/hexacademy.*.log`.

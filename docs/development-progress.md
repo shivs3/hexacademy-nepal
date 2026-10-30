@@ -454,6 +454,15 @@ Update this file at the end of every milestone. Only record what was actually ex
 - The other sites on the server still respond. The only shared-service change was a graceful Nginx reload after `nginx -t`.
 - Next: point the domain at the server, add HTTPS and turn the secure flags back on; configure SMTP, R2 and backups.
 
+## Domain and HTTPS (2026-10-30)
+
+- Live at **https://hexacademynepal.com**, behind Cloudflare in "Full" SSL mode. www, plain HTTP and the old `:8090` address all 301 to the apex. A Let's Encrypt certificate was issued by webroot (valid until 2027-01-28); the shared `certbot.timer` renews it and reloads Nginx (`certbot renew --dry-run` passed).
+- `.env` now has the secure-cookie and SSL-redirect flags on and the domain in the hosts and origins settings; `check --deploy` reports no issues. Visitor IPs come from a Cloudflare real-IP snippet included only in Hexacademy's server block.
+- **Fix: pages hung after the SSL redirect was turned on.** Next's server-side calls to Django are plain HTTP, so Django redirected them. `forwardedHeaders` now passes `X-Forwarded-Proto` (vitest covers it; 136 pass). The same latent bug existed in the Compose setup.
+- **Fix: React hydration error #418 and a CSP-blocked script on signed-in pages.** Cloudflare Email Obfuscation rewrote the user's email in the app shell. Nginx now sends `Cache-Control: no-transform` on Next responses (both the VPS and the Compose configs).
+- Verified on the domain: `/`, `/courses`, `/blog`, `/sitemap.xml` (https URLs), `/robots.txt`, `/login`, the API and `/readyz/` return 200. Playwright smoke run on desktop and mobile passed: sign-up sets a Secure, HttpOnly session cookie; the dashboard, course, exams and profile pages and admin sign-in show no page errors. The smoke accounts were deleted. All other sites on the server still return 200.
+- Still to do: SMTP, R2 object storage, a payment gateway, scheduled backups; optionally Cloudflare "Full (strict)" and HSTS.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.
