@@ -27,12 +27,16 @@ const REQUEST_ID = /^[A-Za-z0-9-]{1,64}$/;
  * X-Forwarded-For with the real client address before it reaches Next, so
  * passing it on gives each visitor their own anonymous throttle bucket and a
  * correct audit IP. Without it every server render would share the Next
- * server's address and one rate limit (ADR-045).
+ * server's address and one rate limit (ADR-045). The scheme Nginx recorded is
+ * passed on too: Django redirects plain-HTTP requests to HTTPS in production,
+ * and this internal hop is plain HTTP even when the visitor used HTTPS.
  */
 export function forwardedHeaders(incoming: Headers): Record<string, string> {
   const out: Record<string, string> = {};
   const ip = incoming.get("x-forwarded-for")?.split(",").pop()?.trim();
   if (ip && IP.test(ip)) out["X-Forwarded-For"] = ip;
+  const proto = incoming.get("x-forwarded-proto");
+  if (proto === "https" || proto === "http") out["X-Forwarded-Proto"] = proto;
   const requestId = incoming.get("x-request-id");
   if (requestId && REQUEST_ID.test(requestId)) out["X-Request-ID"] = requestId;
   return out;

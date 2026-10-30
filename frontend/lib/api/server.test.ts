@@ -14,8 +14,12 @@ describe("forwardedHeaders", () => {
     expect(forwardedHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 2001:db8::1" }))).toEqual({ "X-Forwarded-For": "2001:db8::1" });
   });
 
+  it("passes on the scheme so Django does not redirect the internal hop to HTTPS", () => {
+    expect(forwardedHeaders(new Headers({ "x-forwarded-proto": "https" }))).toEqual({ "X-Forwarded-Proto": "https" });
+  });
+
   it("drops malformed values and sends nothing when absent", () => {
-    expect(forwardedHeaders(new Headers({ "x-forwarded-for": "unknown; drop table", "x-request-id": "x".repeat(200) }))).toEqual({});
+    expect(forwardedHeaders(new Headers({ "x-forwarded-for": "unknown; drop table", "x-request-id": "x".repeat(200), "x-forwarded-proto": "gopher" }))).toEqual({});
     expect(forwardedHeaders(new Headers())).toEqual({});
   });
 });
