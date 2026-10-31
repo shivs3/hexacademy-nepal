@@ -32,6 +32,7 @@ from .admin_serializers import (
     AdminExamListSerializer,
     AdminExamSerializer,
     ExamAnalyticsSerializer,
+    ExamImportSerializer,
     ExamQuestionListInputSerializer,
     ExamQuestionSerializer,
     ExamStatusSerializer,
@@ -316,6 +317,23 @@ class ExamViewSet(viewsets.ModelViewSet):
             services.set_exam_questions(request.user, exam, serializer.validated_data["questions"], request=request)
         links = exam.exam_questions.select_related("question__subject", "question__topic", "question__course")
         return Response(ExamQuestionSerializer(links, many=True, context={"request": request}).data)
+
+    @extend_schema(request={"multipart/form-data": ExamImportSerializer}, responses=ImportReportSerializer)
+    @action(detail=True, methods=["post"], url_path="import-questions", parser_classes=[MultiPartParser])
+    def import_questions(self, request, pk=None):
+        """Import a CSV/XLSX into the bank and append every question to this draft exam."""
+        exam = self.editable()
+        _require(
+            policies.can_create_question_for(request.user, exam.course_id),
+            "You cannot add questions to the bank for this exam's course.",
+        )
+        serializer = ExamImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report = importer.import_questions(
+            request.user, serializer.validated_data["file"], exam=exam,
+            dry_run=serializer.validated_data["dry_run"], request=request,
+        )  # fmt: skip
+        return Response(ImportReportSerializer(report).data)
 
     @extend_schema(request=ExamStatusSerializer, responses=AdminExamSerializer)
     @action(detail=True, methods=["post"], url_path="status")

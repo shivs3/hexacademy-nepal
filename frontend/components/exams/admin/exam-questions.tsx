@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FileQuestionMark, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileQuestionMark, FileUp, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -18,6 +18,7 @@ import { errorMessage } from "@/lib/api/errors";
 import { KIND_LABEL, QUESTION_STATUS, formatMarks } from "@/lib/assessments";
 import type { AdminExam, AdminQuestionSummary, ExamQuestionLink } from "@/types/assessments";
 
+import { ImportDialog } from "./import-dialog";
 import { QuestionPicker } from "./question-picker";
 
 type Row = { question: AdminQuestionSummary; marks: string; negative_marks: string };
@@ -32,6 +33,7 @@ export function ExamQuestions({ exam, onChanged }: { exam: AdminExam; onChanged:
   const [rows, setRows] = useState<Row[] | null>(null);
   const [syncedFrom, setSyncedFrom] = useState<ExamQuestionLink[] | null>(null);
   const [picking, setPicking] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
 
   if (data && data !== syncedFrom) {
@@ -87,7 +89,11 @@ export function ExamQuestions({ exam, onChanged }: { exam: AdminExam; onChanged:
           {exam.question_count != null && exam.question_count < rows.length && ` · each learner gets ${exam.question_count} at random`}
         </p>
         {editable && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setImporting(true)} disabled={dirty} title={dirty ? "Save or undo your changes to the list first." : undefined}>
+              <FileUp className="h-4 w-4" aria-hidden="true" />
+              Import CSV
+            </Button>
             <Button variant="outline" onClick={() => setPicking(true)}>
               <Plus className="h-4 w-4" aria-hidden="true" />
               Add questions
@@ -103,13 +109,21 @@ export function ExamQuestions({ exam, onChanged }: { exam: AdminExam; onChanged:
         <EmptyState
           icon={FileQuestionMark}
           title="No questions yet"
-          description={editable ? "Add questions from the bank. You can set marks for this exam without changing the question." : undefined}
+          description={
+            editable ? "Add questions from the bank, or import a CSV of a full model test: its questions are saved to the bank and added here." : undefined
+          }
           action={
             editable ? (
-              <Button onClick={() => setPicking(true)}>
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add questions
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="outline" onClick={() => setImporting(true)}>
+                  <FileUp className="h-4 w-4" aria-hidden="true" />
+                  Import CSV
+                </Button>
+                <Button onClick={() => setPicking(true)}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add questions
+                </Button>
+              </div>
             ) : undefined
           }
         />
@@ -168,6 +182,17 @@ export function ExamQuestions({ exam, onChanged }: { exam: AdminExam; onChanged:
             );
           })}
         </ol>
+      )}
+
+      {importing && (
+        <ImportDialog
+          examId={exam.id}
+          onClose={() => setImporting(false)}
+          onImported={() => {
+            reload();
+            onChanged();
+          }}
+        />
       )}
 
       {picking && (

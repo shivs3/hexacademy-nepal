@@ -201,6 +201,11 @@ class ImportSerializer(serializers.Serializer):
     dry_run = serializers.BooleanField(default=True)
 
 
+class ExamImportSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    dry_run = serializers.BooleanField(default=True)
+
+
 class ImportReportSerializer(serializers.Serializer):
     rows = serializers.IntegerField()
     valid = serializers.IntegerField()

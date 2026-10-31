@@ -9,7 +9,7 @@ different client.
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Count, OuterRef, Subquery, Sum
+from django.db.models import Count, Max, OuterRef, Subquery, Sum
 from django.utils import timezone
 
 from apps.audit import services as audit
@@ -262,6 +262,28 @@ def set_exam_questions(user, exam: Exam, items: list[dict], *, request=None) -> 
     )
     exam.save(update_fields=["updated_at"])
     audit.record("assessments.exam_questions_set", actor=user, target=exam, request=request, count=len(items))
+    return exam
+
+
+@transaction.atomic
+def append_exam_questions(user, exam: Exam, questions: list[Question], *, request=None) -> Exam:
+    """Add questions after the exam's current list, with their default marks."""
+    exam = _locked(exam)
+    ensure_structure_editable(exam)
+    existing = list(exam.exam_questions.values_list("question_id", flat=True))
+    if len(existing) + len(questions) > MAX_EXAM_QUESTIONS:
+        raise DomainError(f"An exam can hold at most {MAX_EXAM_QUESTIONS} questions.", code="too_many_questions")
+    if any(q.pk in existing for q in questions):
+        raise DomainError("A question is listed twice.", code="duplicate_question")
+    start = (exam.exam_questions.aggregate(last=Max("position"))["last"] or 0) + 1 if existing else 0
+    ExamQuestion.objects.bulk_create(
+        ExamQuestion(
+            exam=exam, question=q, position=start + i, marks=q.default_marks, negative_marks=q.default_negative_marks
+        )
+        for i, q in enumerate(questions)
+    )
+    exam.save(update_fields=["updated_at"])
+    audit.record("assessments.exam_questions_added", actor=user, target=exam, request=request, count=len(questions))
     return exam
 
 

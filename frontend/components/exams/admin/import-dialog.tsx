@@ -55,24 +55,31 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Bank import. With `examId`, the questions also go straight into that draft exam
+ * (and its course), so a whole model test can be loaded from one file.
+ */
 export function ImportDialog({
-  manager,
-  courses,
+  manager = false,
+  courses = [],
+  examId,
   onClose,
   onImported,
 }: {
-  manager: boolean;
-  courses: CourseOption[];
+  manager?: boolean;
+  courses?: CourseOption[];
+  examId?: number;
   onClose: () => void;
   onImported: () => void;
 }) {
+  const forExam = examId !== undefined;
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [course, setCourse] = useState("");
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const needsCourse = !manager && !course;
+  const needsCourse = !forExam && !manager && !course;
 
   async function send(dryRun: boolean) {
     if (!file) return;
@@ -81,12 +88,13 @@ export function ImportDialog({
     const body = new FormData();
     body.append("file", file);
     body.append("dry_run", dryRun ? "true" : "false");
-    if (course) body.append("course", course);
+    if (course && !forExam) body.append("course", course);
     try {
-      const result = await api.post<ImportReport>("/admin/assessments/questions/import/", body);
+      const endpoint = forExam ? `/admin/assessments/exams/${examId}/import-questions/` : "/admin/assessments/questions/import/";
+      const result = await api.post<ImportReport>(endpoint, body);
       setReport(result);
       if (!dryRun && result.created > 0) {
-        toast.success(`Imported ${result.created} question${result.created === 1 ? "" : "s"}.`);
+        toast.success(`Imported ${result.created} question${result.created === 1 ? "" : "s"}${forExam ? " into the exam" : ""}.`);
         onImported();
       }
     } catch (err) {
@@ -102,8 +110,12 @@ export function ImportDialog({
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Import questions"
-      description="CSV or Excel (.xlsx), up to 2,000 rows. Nothing is saved until you confirm the checked file."
+      title={forExam ? "Import questions into this exam" : "Import questions"}
+      description={
+        forExam
+          ? "CSV or Excel (.xlsx). Each question is saved to the question bank and added to the end of this exam. Nothing is saved until you confirm the checked file."
+          : "CSV or Excel (.xlsx), up to 2,000 rows. Nothing is saved until you confirm the checked file."
+      }
       className="max-w-2xl"
       footer={
         <>
@@ -126,6 +138,7 @@ export function ImportDialog({
         <p className="text-sm text-muted">
           Columns: subject, topic, kind (single, multiple or true_false), difficulty, question, option_a–option_h, correct (letters such as B or A,C; true/false for true/false
           questions), explanation, marks, negative_marks, tags (separated by ;) and status. Write maths as \( … \) or $$ … $$.
+          {forExam && " Leave status blank to mark questions ready; the exam uses each row’s marks and negative marks."}
         </p>
         <Button variant="outline" size="sm" className="self-start" onClick={downloadTemplate}>
           <FileDown className="h-4 w-4" aria-hidden="true" />
@@ -143,23 +156,25 @@ export function ImportDialog({
             }}
           />
         </Field>
-        <Field label="Course" htmlFor="import-course" required={!manager} hint={manager ? "Leave as shared to add to the bank every course can use." : "Imported questions belong to this course."}>
-          <Select
-            id="import-course"
-            value={course}
-            onChange={(e) => {
-              setCourse(e.target.value);
-              setReport(null);
-            }}
-          >
-            <option value="">{manager ? "Shared bank" : "Choose a course"}</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {!forExam && (
+          <Field label="Course" htmlFor="import-course" required={!manager} hint={manager ? "Leave as shared to add to the bank every course can use." : "Imported questions belong to this course."}>
+            <Select
+              id="import-course"
+              value={course}
+              onChange={(e) => {
+                setCourse(e.target.value);
+                setReport(null);
+              }}
+            >
+              <option value="">{manager ? "Shared bank" : "Choose a course"}</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         {error && <Alert tone="danger">{error}</Alert>}
 
@@ -177,7 +192,7 @@ export function ImportDialog({
               )
             ) : (
               <Alert tone="success" title="Import complete">
-                {report.created} question{report.created === 1 ? "" : "s"} saved.
+                {report.created} question{report.created === 1 ? "" : "s"} saved{forExam ? " to the bank and added to the exam" : ""}.
               </Alert>
             )}
             {report.errors.length > 0 && (

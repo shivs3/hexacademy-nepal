@@ -246,6 +246,72 @@ def test_import_rejects_double_escaped_maths(client_for, subject):
     assert report["valid"] == 1  # a real \\ row break inside \( \) is still accepted
 
 
+EXAM_CSV = (
+    "subject,kind,question,option_a,option_b,correct,marks,negative_marks,status\n"
+    "{s},single,First new,Yes,No,A,2,0.5,\n"
+    "{s},true_false,Second new,,,true,1,0,draft\n"
+)
+
+
+def test_exam_import_adds_to_bank_and_appends_to_exam(client_for, make_exam, subject):
+    client = client_for("exam_coordinator")
+    exam = make_exam(questions=2, status="draft")
+    url = f"{EXAMS}{exam.pk}/import-questions/"
+    text = EXAM_CSV.format(s=subject.slug)
+
+    report = client.post(url, {"file": upload(text), "dry_run": True}, format="multipart").json()
+    assert (report["valid"], report["created"], report["errors"]) == (2, 0, [])
+    assert exam.exam_questions.count() == 2 and Question.objects.count() == 2
+
+    report = client.post(url, {"file": upload(text), "dry_run": False}, format="multipart").json()
+    assert report["created"] == 2
+    links = list(exam.exam_questions.select_related("question").order_by("position"))
+    assert [link.position for link in links] == [0, 1, 2, 3]
+    first, second = links[2], links[3]
+    # In the bank, with the exam's marks and the CSV status (blank means ready to use).
+    assert first.question.prompt == "<p>First new</p>" and first.question.status == "active"
+    assert (first.marks, first.negative_marks) == (Decimal("2"), Decimal("0.5"))
+    assert second.question.status == "draft" and second.question.kind == "true_false"
+
+
+def test_exam_import_saves_nothing_when_a_row_fails(client_for, make_exam, subject):
+    client = client_for("exam_coordinator")
+    exam = make_exam(questions=1, status="draft")
+    text = EXAM_CSV.format(s=subject.slug) + f"{subject.slug},single,Bad,Yes,No,Z,1,0,\n"
+    report = client.post(
+        f"{EXAMS}{exam.pk}/import-questions/", {"file": upload(text), "dry_run": False}, format="multipart"
+    ).json()
+    assert report["created"] == 0 and [e["row"] for e in report["errors"]] == [4]
+    assert exam.exam_questions.count() == 1 and Question.objects.count() == 1
+
+
+def test_exam_import_needs_a_draft_exam(client_for, make_exam, subject):
+    client = client_for("exam_coordinator")
+    exam = make_exam(questions=1, status="published")
+    res = client.post(
+        f"{EXAMS}{exam.pk}/import-questions/",
+        {"file": upload(EXAM_CSV.format(s=subject.slug)), "dry_run": True},
+        format="multipart",
+    )
+    assert res.status_code == 409 and Question.objects.count() == 1
+
+
+def test_instructor_exam_import_is_limited_to_their_course(client_for, make_course, make_exam, subject):
+    teacher = client_for("instructor")
+    mine = make_course(instructor=teacher.user)
+    theirs = make_exam(questions=0, status="draft", course=make_course())
+    own = make_exam(questions=0, status="draft", course=mine)
+    text = EXAM_CSV.format(s=subject.slug)
+    denied = teacher.post(f"{EXAMS}{theirs.pk}/import-questions/", {"file": upload(text)}, format="multipart")
+    assert denied.status_code in (403, 404)
+    res = teacher.post(
+        f"{EXAMS}{own.pk}/import-questions/", {"file": upload(text), "dry_run": False}, format="multipart"
+    )
+    assert res.json()["created"] == 2
+    assert set(Question.objects.values_list("course_id", flat=True)) == {mine.pk}
+    assert own.exam_questions.count() == 2
+
+
 def test_import_rejects_other_file_types(client_for):
     client = client_for("exam_coordinator")
     res = client.post(f"{QUESTIONS}import/", {"file": upload("x", name="q.txt")}, format="multipart")

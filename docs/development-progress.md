@@ -463,6 +463,11 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Verified on the domain: `/`, `/courses`, `/blog`, `/sitemap.xml` (https URLs), `/robots.txt`, `/login`, the API and `/readyz/` return 200. Playwright smoke run on desktop and mobile passed: sign-up sets a Secure, HttpOnly session cookie; the dashboard, course, exams and profile pages and admin sign-in show no page errors. The smoke accounts were deleted. All other sites on the server still return 200.
 - Still to do: SMTP, R2 object storage, a payment gateway, scheduled backups; optionally Cloudflare "Full (strict)" and HSTS.
 
+## Question import fixes and exam CSV import (2026-10-31)
+
+- Questions 46–55 on the server showed raw LaTeX. The CSV that created them had every backslash doubled (`\\(\\frac…\\)`). They were repaired as new versions (all 309 stored formulas now parse in KaTeX), and the importer now rejects rows with doubled maths markers.
+- New: **Import CSV** on an exam's Questions tab (`POST …/exams/{id}/import-questions/`). One file loads a full model test: the questions go into the bank (exam's course, ready unless the row says otherwise) and are appended to the draft exam with the row's marks. Backend tests cover dry run, all-or-nothing, draft-only and instructor scope; `e2e/exam-import.spec.ts` covers the UI (passed desktop and mobile, plus the existing exam E2E).
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

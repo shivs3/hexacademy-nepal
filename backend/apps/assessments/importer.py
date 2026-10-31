@@ -180,7 +180,7 @@ def _check_maths(field: str, text: str):
         raise RowError(field, r"The maths has doubled backslashes. Write \( \frac{a}{b} \), not \\( \\frac{a}{b} \\).")
 
 
-def parse_row(row: dict, lookup: Lookup) -> tuple[dict, list[dict]]:
+def parse_row(row: dict, lookup: Lookup, default_status: str = Question.Status.DRAFT) -> tuple[dict, list[dict]]:
     get = lambda key: (row.get(key) or "").strip()  # noqa: E731
     _check_maths("question", get("question"))
     _check_maths("explanation", get("explanation"))
@@ -200,7 +200,7 @@ def parse_row(row: dict, lookup: Lookup) -> tuple[dict, list[dict]]:
     difficulty = (get("difficulty") or "medium").lower()
     if difficulty not in Difficulty.values:
         raise RowError("difficulty", "Use easy, medium or hard.")
-    status = (get("status") or "draft").lower()
+    status = (get("status") or default_status).lower()
     if status not in Question.Status.values:
         raise RowError("status", "Use draft, active or retired.")
     prompt = text_to_html(get("question"))
@@ -247,21 +247,39 @@ def parse_row(row: dict, lookup: Lookup) -> tuple[dict, list[dict]]:
     return data, options
 
 
-def import_questions(user, upload, *, course=None, dry_run=False, request=None) -> dict:
+def import_questions(user, upload, *, course=None, exam=None, dry_run=False, request=None) -> dict:
+    """Adds the file's questions to the bank. With `exam`, they belong to the exam's
+    course, default to ready (active) and are appended to the exam, all or nothing."""
+    if exam is not None:
+        course = exam.course
+        services.ensure_structure_editable(exam)
     rows = read_rows(upload)
     lookup = Lookup()
+    default_status = Question.Status.ACTIVE if exam is not None else Question.Status.DRAFT
     parsed, errors = [], []
     for number, row in enumerate(rows, start=2):  # row 1 is the header
         try:
-            parsed.append(parse_row(row, lookup))
+            parsed.append(parse_row(row, lookup, default_status))
         except RowError as exc:
             errors.append({"row": number, "field": exc.field, "message": exc.message})
+    if exam is not None and parsed:
+        room = services.MAX_EXAM_QUESTIONS - exam.exam_questions.count()
+        if len(parsed) > room:
+            raise DomainError(
+                f"An exam can hold at most {services.MAX_EXAM_QUESTIONS} questions; "
+                f"there is room for {max(room, 0)} more.",
+                code="too_many_questions",
+            )
     report = {"rows": len(rows), "valid": len(parsed), "created": 0, "errors": errors, "dry_run": dry_run}
     if errors or dry_run or not parsed:
         return report
     with transaction.atomic():
-        for data, options in parsed:
+        created = [
             services.create_question(user, {**data, "course": course}, options, request=request, audit_event=False)
+            for data, options in parsed
+        ]
+        if exam is not None:
+            services.append_exam_questions(user, exam, created, request=request)
     report["created"] = len(parsed)
     audit.record(
         "assessments.questions_imported",
@@ -269,6 +287,7 @@ def import_questions(user, upload, *, course=None, dry_run=False, request=None) 
         request=request,
         count=len(parsed),
         course=course.pk if course else None,
+        exam=exam.pk if exam else None,
     )
     return report
 

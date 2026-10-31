@@ -157,6 +157,7 @@ Learners see published and closed exams that are open to everyone, belong to a c
 | GET | `/admin/assessments/questions/export/` | CSV including answers, limited to questions the caller may edit (max 5,000 rows). Audited |
 | GET/POST/PATCH/DELETE | `/admin/assessments/exams/` | Visible: exam managers all; authors their courses; TAs their courses (read only). Scoring fields (course, kind, question count, negative marking, pass marks, duration, shuffles) only change in draft. Delete: drafts without attempts |
 | GET/PUT | `…/exams/{id}/questions/` | PUT replaces the list `{questions: [{question, marks?, negative_marks?}]}` (draft only, max 300) |
+| POST | `…/exams/{id}/import-questions/` | Multipart `file`, `dry_run` (default true). Same format and report as the bank import; the questions are created in the bank under the exam's course (blank status = active) and appended to the draft exam with the row's marks, all or nothing. Needs exam edit rights and question rights for that course; 409 unless the exam is a draft |
 | POST | `…/exams/{id}/status/` `{status}` | Publishing returns 400 `exam_not_ready` listing every problem; an exam with attempts cannot return to draft |
 | POST | `…/exams/{id}/publish-results/` | Manual-release exams only |
 | GET | `…/exams/{id}/attempts/`, `…/analytics/`, `…/results-export/` | Results, per-question difficulty and score spread, CSV export |
