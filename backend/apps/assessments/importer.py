@@ -169,8 +169,23 @@ class Lookup:
             self.topics[(t.subject_id, t.name.lower())] = t
 
 
+# "\\(" means the file was written with every backslash doubled (JSON or code
+# string escaping). Imported as is, each formula keeps stray backslashes and
+# fails to render, so reject the row instead.
+_DOUBLED_MARKER = re.compile(r"\\\\[()]")
+
+
+def _check_maths(field: str, text: str):
+    if _DOUBLED_MARKER.search(text):
+        raise RowError(field, r"The maths has doubled backslashes. Write \( \frac{a}{b} \), not \\( \\frac{a}{b} \\).")
+
+
 def parse_row(row: dict, lookup: Lookup) -> tuple[dict, list[dict]]:
     get = lambda key: (row.get(key) or "").strip()  # noqa: E731
+    _check_maths("question", get("question"))
+    _check_maths("explanation", get("explanation"))
+    for column in OPTION_COLUMNS:
+        _check_maths("options", get(column))
     subject = lookup.subjects.get(get("subject").lower())
     if subject is None:
         raise RowError("subject", f"No subject called “{get('subject')}”.")

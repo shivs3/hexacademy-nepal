@@ -232,6 +232,20 @@ def test_import_reports_every_error_and_saves_nothing(client_for, subject):
     assert not Question.objects.exists()
 
 
+def test_import_rejects_double_escaped_maths(client_for, subject):
+    client = client_for("exam_coordinator")
+    text = (
+        "subject,question,option_a,option_b,correct,explanation\n"
+        f"{subject.slug},Evaluate \\\\(\\\\int x\\\\,dx\\\\),Yes,No,A,\n"
+        f"{subject.slug},Pick one,\\\\(x^2\\\\),No,A,\n"
+        f"{subject.slug},Fine,Yes,No,A,Because \\\\(x\\\\)\n"
+        f"{subject.slug},Matrix \\(\\begin{{pmatrix}} 1 \\\\ 2 \\end{{pmatrix}}\\),Yes,No,A,\n"
+    )
+    report = client.post(f"{QUESTIONS}import/", {"file": upload(text), "dry_run": True}, format="multipart").json()
+    assert [(e["row"], e["field"]) for e in report["errors"]] == [(2, "question"), (3, "options"), (4, "explanation")]
+    assert report["valid"] == 1  # a real \\ row break inside \( \) is still accepted
+
+
 def test_import_rejects_other_file_types(client_for):
     client = client_for("exam_coordinator")
     res = client.post(f"{QUESTIONS}import/", {"file": upload("x", name="q.txt")}, format="multipart")
