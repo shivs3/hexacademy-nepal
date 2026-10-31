@@ -11,12 +11,49 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge, EmptyState } from "@/components/ui/feedback";
 import { Select } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 import { useApiResource, useDebounced } from "@/hooks/use-api-resource";
-import { buildPath } from "@/lib/api/client";
+import { api, buildPath } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/errors";
 import { DIFFICULTY_LABEL, KIND_LABEL, QUESTION_STATUS, formatMarks } from "@/lib/assessments";
 import { formatDateTime } from "@/lib/utils";
 import type { Paginated } from "@/types/accounts";
-import type { AdminQuestionSummary, AdminSubject, CourseOption } from "@/types/assessments";
+import type { AdminQuestionSummary, AdminSubject, CourseOption, QuestionStatus } from "@/types/assessments";
+
+/** Status changed in place; the server checks the caller may edit this question. */
+function StatusSelect({ question, onSaved }: { question: AdminQuestionSummary; onSaved: (q: AdminQuestionSummary) => void }) {
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+
+  async function change(status: QuestionStatus) {
+    setSaving(true);
+    try {
+      const saved = await api.patch<AdminQuestionSummary>(`/admin/assessments/questions/${question.id}/`, { status });
+      onSaved({ ...question, status: saved.status, updated_at: saved.updated_at });
+      toast.success(`Question #${question.id} is now ${QUESTION_STATUS[saved.status].label.toLowerCase()}.`);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Select
+      aria-label={`Status of question ${question.id}`}
+      value={question.status}
+      disabled={saving}
+      onChange={(e) => change(e.target.value as QuestionStatus)}
+      className="w-32"
+    >
+      {Object.entries(QUESTION_STATUS).map(([value, s]) => (
+        <option key={value} value={value}>
+          {s.label}
+        </option>
+      ))}
+    </Select>
+  );
+}
 
 export function QuestionsList({ manager, canAuthor, initialSubject }: { manager: boolean; canAuthor: boolean; initialSubject: string }) {
   const [search, setSearch] = useState("");
@@ -25,7 +62,7 @@ export function QuestionsList({ manager, canAuthor, initialSubject }: { manager:
   const [importing, setImporting] = useState(false);
   const q = useDebounced(search);
   const query = { ...filters, search: q };
-  const { data, error, reload } = useApiResource<Paginated<AdminQuestionSummary>>("/admin/assessments/questions/", { ...query, page });
+  const { data, error, reload, setData } = useApiResource<Paginated<AdminQuestionSummary>>("/admin/assessments/questions/", { ...query, page });
   const subjects = useApiResource<AdminSubject[]>("/admin/assessments/subjects/");
   const courses = useApiResource<CourseOption[]>("/admin/assessments/course-options/");
   const subject = subjects.data?.find((s) => String(s.id) === filters.subject);
@@ -176,7 +213,14 @@ export function QuestionsList({ manager, canAuthor, initialSubject }: { manager:
                       <p className="text-xs text-muted">{DIFFICULTY_LABEL[question.difficulty]}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge tone={QUESTION_STATUS[question.status].tone}>{QUESTION_STATUS[question.status].label}</Badge>
+                      {question.can_edit ? (
+                        <StatusSelect
+                          question={question}
+                          onSaved={(updated) => setData({ ...data, results: data.results.map((r) => (r.id === updated.id ? updated : r)) })}
+                        />
+                      ) : (
+                        <Badge tone={QUESTION_STATUS[question.status].tone}>{QUESTION_STATUS[question.status].label}</Badge>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {formatMarks(question.default_marks)}

@@ -467,6 +467,7 @@ Update this file at the end of every milestone. Only record what was actually ex
 
 - Questions 46–55 on the server showed raw LaTeX. The CSV that created them had every backslash doubled (`\\(\\frac…\\)`). They were repaired as new versions (all 309 stored formulas now parse in KaTeX), and the importer now rejects rows with doubled maths markers.
 - New: **Import CSV** on an exam's Questions tab (`POST …/exams/{id}/import-questions/`). One file loads a full model test: the questions go into the bank (exam's course, ready unless the row says otherwise) and are appended to the draft exam with the row's marks. Backend tests cover dry run, all-or-nothing, draft-only and instructor scope; `e2e/exam-import.spec.ts` covers the UI (passed desktop and mobile, plus the existing exam E2E).
+- The question bank list now has a status dropdown on each row the user may edit (others still see a badge). It PATCHes `{status}` on the question; a status change doesn't create a new version. The same E2E retires a question from the list.
 
 ## How to continue
 

@@ -70,7 +70,7 @@ def test_edit_bumps_version_only_on_content_change(client_for, make_question):
     client = client_for("exam_coordinator")
     client.patch(f"{QUESTIONS}{question.pk}/", {"status": "retired"}, format="json")
     question.refresh_from_db()
-    assert question.version == 1
+    assert (question.status, question.version) == ("retired", 1)
     res = client.patch(f"{QUESTIONS}{question.pk}/", {"prompt": "<p>Changed</p>"}, format="json")
     assert res.json()["version"] == 2
     versions = client.get(f"{QUESTIONS}{question.pk}/versions/").json()

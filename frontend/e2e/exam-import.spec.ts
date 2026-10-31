@@ -62,10 +62,19 @@ test("a CSV import fills a new exam and its questions join the bank", async ({ p
 
   // The questions are in the bank too, ready to use elsewhere.
   const bank = await page.request.get(`/api/v1/admin/assessments/questions/?search=${tag}`);
-  const listed = (await bank.json()) as { results: { status: string }[] };
+  const listed = (await bank.json()) as { results: { id: number; status: string }[] };
   expect(listed.results.map((q) => q.status)).toEqual(["active", "active"]);
 
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText("Exam published.")).toBeVisible();
+
+  // A status can be changed straight from the bank list.
+  const id = listed.results[0].id;
+  await page.goto("/admin/assessments/questions");
+  await page.getByPlaceholder("Search text, tag or #id").fill(tag);
+  await page.getByLabel(`Status of question ${id}`).selectOption("retired");
+  await expect(page.getByText(`Question #${id} is now retired.`)).toBeVisible();
+  const saved = await page.request.get(`/api/v1/admin/assessments/questions/${id}/`);
+  expect(((await saved.json()) as { status: string }).status).toBe("retired");
 });
