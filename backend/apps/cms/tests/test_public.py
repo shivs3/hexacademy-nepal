@@ -36,6 +36,13 @@ def test_site_settings_public_view_and_announcement_window(anon, editor):
     assert anon.get("/api/v1/site-settings/").json()["announcement"]["text"] == "Admissions open"
 
 
+def test_site_name_beside_logo_is_on_by_default_and_can_be_turned_off(anon, editor):
+    assert anon.get("/api/v1/site-settings/").json()["show_name_with_logo"] is True
+    res = editor.patch("/api/v1/admin/cms/site-settings/", {"show_name_with_logo": False}, format="json")
+    assert res.status_code == 200, res.json()
+    assert anon.get("/api/v1/site-settings/").json()["show_name_with_logo"] is False
+
+
 def test_site_settings_validation(editor):
     res = editor.patch(
         "/api/v1/admin/cms/site-settings/",

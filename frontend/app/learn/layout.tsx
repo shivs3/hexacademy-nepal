@@ -15,7 +15,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
     <div className="flex min-h-screen flex-col bg-page">
       <header className="sticky top-0 z-30 border-b border-line bg-white">
         <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
-          <Logo siteName={settings.site_name} logoUrl={settings.logo?.url} />
+          <Logo siteName={settings.site_name} logoUrl={settings.logo?.url} showName={settings.show_name_with_logo} />
           <nav aria-label="Account" className="flex items-center gap-4 text-sm font-medium">
             <Link href="/courses" className="text-navy hover:text-teal-700">
               Courses

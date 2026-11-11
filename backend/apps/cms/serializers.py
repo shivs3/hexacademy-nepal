@@ -108,6 +108,7 @@ class PublicSiteSettingsSerializer(serializers.ModelSerializer):
             "logo",
             "logo_inverted",
             "favicon",
+            "show_name_with_logo",
             "color_primary",
             "color_accent",
             "color_secondary",

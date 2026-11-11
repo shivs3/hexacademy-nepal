@@ -28,7 +28,7 @@ export function SiteFooter({
     <footer className="mt-auto bg-navy text-white/80">
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="max-w-sm">
-          <Logo siteName={settings.site_name} logoUrl={settings.logo_inverted?.url ?? null} inverted />
+          <Logo siteName={settings.site_name} logoUrl={settings.logo_inverted?.url ?? null} showName={settings.show_name_with_logo} inverted />
           {settings.tagline && <p className="mt-4 text-sm">{settings.tagline}</p>}
           {settings.footer_text && <p className="mt-3 text-sm text-white/60">{settings.footer_text}</p>}
         </div>

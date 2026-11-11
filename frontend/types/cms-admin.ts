@@ -115,6 +115,7 @@ export type AdminSiteSettings = {
   logo: number | null;
   logo_inverted: number | null;
   favicon: number | null;
+  show_name_with_logo: boolean;
   color_primary: string;
   color_accent: string;
   color_secondary: string;

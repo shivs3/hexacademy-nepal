@@ -209,6 +209,7 @@ class AdminSiteSettingsSerializer(serializers.Serializer):
     logo = ImageAssetField()
     logo_inverted = ImageAssetField()
     favicon = ImageAssetField()
+    show_name_with_logo = serializers.BooleanField(required=False)
     color_primary = serializers.CharField(max_length=7)
     color_accent = serializers.CharField(max_length=7)
     color_secondary = serializers.CharField(max_length=7)

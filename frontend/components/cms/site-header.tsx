@@ -15,6 +15,7 @@ import { CmsLink } from "./cms-link";
 type Props = {
   siteName: string;
   logoUrl: string | null;
+  showName?: boolean;
   items: MenuLink[];
   signedIn: boolean;
 };
@@ -24,7 +25,7 @@ function isActive(pathname: string, url: string) {
   return url === "/" ? pathname === "/" : pathname === url || pathname.startsWith(`${url}/`);
 }
 
-export function SiteHeader({ siteName, logoUrl, items, signedIn }: Props) {
+export function SiteHeader({ siteName, logoUrl, showName, items, signedIn }: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openPath, setOpenPath] = useState(pathname);
@@ -42,7 +43,7 @@ export function SiteHeader({ siteName, logoUrl, items, signedIn }: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo siteName={siteName} logoUrl={logoUrl} />
+        <Logo siteName={siteName} logoUrl={logoUrl} showName={showName} />
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           {items.map((item) =>

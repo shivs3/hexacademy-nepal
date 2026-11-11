@@ -61,6 +61,7 @@ function payload(f: Form) {
     logo: f.logo,
     logo_inverted: f.logo_inverted,
     favicon: f.favicon,
+    show_name_with_logo: f.show_name_with_logo,
     color_primary: f.color_primary,
     color_accent: f.color_accent,
     color_secondary: f.color_secondary,
@@ -164,6 +165,12 @@ function SettingsEditor({ initial, canUpload }: { initial: AdminSiteSettings; ca
           {imageField("logo", "Logo", "Shown in the header on light backgrounds. A wide PNG or WebP works best.")}
           {imageField("logo_inverted", "Logo for dark backgrounds", "Used in the footer. Leave empty to show the site name.")}
           {imageField("favicon", "Favicon", "Square image, at least 64×64 pixels.")}
+          <div className="flex items-center gap-2 md:col-span-2">
+            <Checkbox id="ss-show_name_with_logo" checked={form.show_name_with_logo} onChange={(e) => set("show_name_with_logo", e.target.checked)} />
+            <Label htmlFor="ss-show_name_with_logo" className="font-normal">
+              Show the site name beside the logo (turn off if your logo already contains the name)
+            </Label>
+          </div>
         </CardBody>
       </Card>
 

@@ -13,6 +13,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   logo: null,
   logo_inverted: null,
   favicon: null,
+  show_name_with_logo: true,
   color_primary: "#102A43",
   color_accent: "#0A8BA7",
   color_secondary: "#14B8A6",

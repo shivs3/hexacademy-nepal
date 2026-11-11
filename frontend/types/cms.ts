@@ -27,6 +27,7 @@ export type SiteSettings = {
   logo: MediaRef | null;
   logo_inverted: MediaRef | null;
   favicon: MediaRef | null;
+  show_name_with_logo: boolean;
   color_primary: string;
   color_accent: string;
   color_secondary: string;

@@ -7,7 +7,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
   return (
     <div className="grid min-h-screen lg:grid-cols-[1fr_minmax(0,34rem)]">
       <aside className="relative hidden overflow-hidden bg-navy lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <Logo inverted siteName={settings.site_name} logoUrl={settings.logo_inverted?.url ?? null} />
+        <Logo inverted siteName={settings.site_name} logoUrl={settings.logo_inverted?.url ?? null} showName={settings.show_name_with_logo} />
         <div className="max-w-md">
           <p className="font-display text-3xl font-semibold leading-tight text-white">
             {panel.heading || settings.tagline || settings.site_name}
@@ -22,7 +22,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       <main id="main" className="flex flex-col justify-center px-4 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 lg:hidden">
-            <Logo siteName={settings.site_name} logoUrl={settings.logo?.url ?? null} />
+            <Logo siteName={settings.site_name} logoUrl={settings.logo?.url ?? null} showName={settings.show_name_with_logo} />
           </div>
           {children}
         </div>

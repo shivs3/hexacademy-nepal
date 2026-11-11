@@ -82,6 +82,9 @@ class SiteSettings(models.Model):
         help_text="Variant for dark backgrounds (footer, sidebar).",
     )
     favicon = models.ForeignKey(MediaAsset, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    show_name_with_logo = models.BooleanField(
+        default=True, help_text="Show the site name beside an uploaded logo. Turn off if the logo already contains it."
+    )
     color_primary = models.CharField(max_length=7, default="#102A43")
     color_accent = models.CharField(max_length=7, default="#0A8BA7")
     color_secondary = models.CharField(max_length=7, default="#14B8A6")

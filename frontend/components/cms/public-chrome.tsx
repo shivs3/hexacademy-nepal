@@ -20,7 +20,7 @@ export async function PublicChrome({ children, banner }: { children: React.React
     <div className="flex min-h-screen flex-col">
       {banner}
       <AnnouncementBar announcement={settings.announcement} />
-      <SiteHeader siteName={settings.site_name} logoUrl={settings.logo?.url ?? null} items={header} signedIn={!!user} />
+      <SiteHeader siteName={settings.site_name} logoUrl={settings.logo?.url ?? null} showName={settings.show_name_with_logo} items={header} signedIn={!!user} />
       <main id="main" className="flex-1">
         {children}
       </main>
