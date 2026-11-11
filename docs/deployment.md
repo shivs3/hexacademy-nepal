@@ -47,7 +47,7 @@ The unit files and Nginx site are in `infrastructure/vps/`. UFW allows 8090/tcp 
 
 Pages come from Next, so Django's HSTS header only appears on API responses. Turn on HSTS in Cloudflare (SSL/TLS → Edge Certificates) once you're sure the site will stay on HTTPS. With the origin certificate in place, the Cloudflare SSL mode can be raised to "Full (strict)".
 
-**Not set up yet:** SMTP (emails go to the backend log), object storage (media is on local disk), payment gateways, and scheduled database backups.
+**Not set up yet:** SMTP (emails go to the backend log), object storage (media is on local disk; see "Media storage: connecting Cloudflare R2"), payment gateways, and scheduled database backups.
 
 **Redeploy** (from a clean checkout of `main` on your machine):
 
@@ -71,6 +71,25 @@ ssh root@80.241.208.65 'cp /etc/nginx/sites-available/hexacademy-nepal /root/hex
 ```
 
 Logs: `journalctl -u hexacademy-backend -f` (likewise for the other units) and `/var/log/nginx/hexacademy.*.log`.
+
+## Media storage: connecting Cloudflare R2
+
+The code already supports R2 (`USE_S3_STORAGE` in `config/settings/base.py`). Public media (CMS images, thumbnails, avatars) goes to a public bucket served on `media.hexacademynepal.com`. Lesson files and assignment submissions go to a private bucket and are handed out as 5-minute signed links after the backend checks access. The CSP and `next.config.ts` already allow `https://media.hexacademynepal.com`. If you use another domain, set `CSP_MEDIA_ORIGINS` for the frontend and add the host to `images.remotePatterns`.
+
+In the Cloudflare dashboard (R2 Object Storage):
+
+1. Create two buckets: `hexacademy-public` and `hexacademy-private`.
+2. On `hexacademy-public`, open Settings → Custom Domains → Connect domain, then enter `media.hexacademynepal.com`. Leave the `r2.dev` public URL disabled on both buckets, and never make the private bucket public.
+3. Under Manage API tokens, create an account API token with **Object Read & Write** permission, limited to those two buckets. Note the Access Key ID, the Secret Access Key (shown once) and the account ID (in the S3 endpoint `https://<account-id>.r2.cloudflarestorage.com`).
+
+On the server, run `sudo bash /var/www/SHIV/hexacademy-nepal/infrastructure/scripts/configure-r2.sh`:
+
+- It prompts for the values; the secret is read without echo.
+- It test-writes, reads and deletes an object in each bucket, and checks that the public object is served on the custom domain.
+- It copies existing `media/` and `private_media/` files to the matching bucket, keeping each object key the same as the file's path.
+- Only then does it write the `S3_*` settings into `backend/.env` (it backs up the old file first, and both files are mode 600) and restart the backend and Celery.
+
+Local files are kept. To roll back, set `USE_S3_STORAGE=false` and restart. Rotate the token in the dashboard if it is ever exposed, then rerun the script.
 
 ## Payments: activating Khalti, eSewa and bank transfer
 
