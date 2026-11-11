@@ -17,7 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: settings.default_meta_title || settings.site_name, template: `%s | ${settings.site_name}` },
     description: settings.default_meta_description || undefined,
     applicationName: settings.site_name,
-    icons: settings.favicon ? { icon: settings.favicon.url } : undefined,
+    // The uploaded favicon is the only icon when set; public/favicon.ico is the fallback.
+    icons: settings.favicon ? { icon: settings.favicon.url, apple: settings.favicon.url } : { icon: "/favicon.ico" },
   };
 }
 
