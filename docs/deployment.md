@@ -47,7 +47,9 @@ The unit files and Nginx site are in `infrastructure/vps/`. UFW allows 8090/tcp 
 
 Pages come from Next, so Django's HSTS header only appears on API responses. Turn on HSTS in Cloudflare (SSL/TLS → Edge Certificates) once you're sure the site will stay on HTTPS. With the origin certificate in place, the Cloudflare SSL mode can be raised to "Full (strict)".
 
-**Not set up yet:** SMTP (emails go to the backend log), object storage (media is on local disk; see "Media storage: connecting Cloudflare R2"), payment gateways, and scheduled database backups.
+**Media** is on Cloudflare R2 (connected 2026-11-11; buckets `hexacademy-public` on `media.hexacademynepal.com` and `hexacademy-private`). The old local copies in `backend/private_media` are kept as a fallback.
+
+**Not set up yet:** SMTP (emails go to the backend log), payment gateways, and scheduled database backups.
 
 **Redeploy** (from a clean checkout of `main` on your machine):
 
