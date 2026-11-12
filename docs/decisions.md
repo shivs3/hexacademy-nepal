@@ -272,3 +272,8 @@ Short records of choices that are expensive to reverse. Newest last.
 ## ADR-052: Element defaults sit in Tailwind's base layer
 **Decision:** The global `body`, `h1`–`h4` and `:focus-visible` rules are inside `@layer base`. Before this, the unlayered `h2 { color: navy }` rule beat utilities such as `text-white`, so headings in dark and accent sections were navy on teal (2.22:1). Text in mint uses `mint-800` (8.65:1 on `mint-50`), because brand mint is a fill colour.
 **Consequences:** Utilities always win over the element defaults. axe found this only once the demo home page used dark and accent sections, and the a11y E2E spec now covers it.
+
+## ADR-053: Notice PDFs are rendered to images on the server
+**Decision:** When a notice is saved with a PDF, pypdfium2 renders each page (up to 10) to a WebP image in public media. The site shows those images in the pop-up and on `/notices/{id}`, and offers the original PDF as a download.
+**Why:** The owner wants notices read inside the website, not in the browser's PDF viewer. Embedding the PDF would need an iframe/object (CSP changes, and mobile browsers often won't show it inline) or pdf.js (a large client bundle plus a worker). Images work everywhere, load fast, and the first page doubles as the pop-up preview.
+**Consequences:** Text in a rendered PDF can't be selected or searched, so the summary and optional details field carry the words. Rendering is synchronous, so a bad PDF is refused immediately with a field error. Changing the attachment deletes the old page images after the transaction commits.

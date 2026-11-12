@@ -1,9 +1,10 @@
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from . import admin_views, views
+from . import admin_views, notice_api, views
 
 router = SimpleRouter()
+router.register("admin/cms/notices", notice_api.AdminNoticeViewSet, basename="admin-cms-notices")
 router.register("admin/cms/pages", admin_views.AdminPageViewSet, basename="admin-cms-pages")
 router.register("admin/cms/media", admin_views.AdminMediaViewSet, basename="admin-cms-media")
 router.register("admin/cms/blog/posts", admin_views.AdminBlogPostViewSet, basename="admin-cms-blog-posts")
@@ -19,6 +20,8 @@ urlpatterns = [
     path("blog/posts/", views.BlogPostListView.as_view(), name="blog-posts"),
     path("blog/posts/<slug:slug>/", views.BlogPostDetailView.as_view(), name="blog-post"),
     path("blog/categories/", views.BlogCategoryListView.as_view(), name="blog-categories"),
+    path("notices/", notice_api.NoticeListView.as_view(), name="notices"),
+    path("notices/<int:pk>/", notice_api.NoticeDetailView.as_view(), name="notice"),
     path("seo/sitemap/", views.SitemapView.as_view(), name="seo-sitemap"),
     path("newsletter/subscribe/", views.NewsletterSubscribeView.as_view(), name="newsletter-subscribe"),
     # Staff

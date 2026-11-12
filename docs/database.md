@@ -55,13 +55,15 @@ BlogPost ──► User (author), MediaAsset (cover, og_image)   SET_NULL
 | `cms_menuitem` | `label`, then either `page` (resolved to its current path) or `url` (validated). `position`, `open_in_new_tab`, `is_visible`. Index on `(menu, parent, position)` |
 | `cms_blogcategory` | `name` unique (80), `slug` unique (90) |
 | `cms_blogpost` | `slug` unique (140), `excerpt`, `body` (sanitised HTML), `status`, `published_at`. Index on `(status, published_at)`. `CHECK`: published ⇒ `published_at` set. A future `published_at` means the post is scheduled |
+| `cms_notice` | `title`, `summary` (500, plain), `body` (sanitised HTML), `attachment` and `rendered_attachment` → media (SET NULL), `is_active`, `show_in_popup`, `starts_at`, `ends_at`, `position`. Index on `(is_active, starts_at, ends_at)`. `CHECK`: `ends_at > starts_at` |
+| `cms_noticepage` | `notice` (CASCADE), `number`, `image` (file under `notices/YYYY/MM/`), `width`, `height`. Unique `(notice, number)`. The PDF's pages as images; replaced when the attachment changes |
 | `cms_newslettersubscriber` | `email` unique on `lower(email)`, `source`, `consented_at`, `unsubscribed_at` |
 
 SEO columns, shared by pages and posts through the `SeoFields` abstract model: `meta_title`, `meta_description`, `canonical_url`, `og_image`, `noindex`.
 
 Section JSON refers to media by id. When an asset is deleted, the foreign-key columns are set to NULL and an id left inside section JSON simply resolves to no image when rendered.
 
-Custom permissions: `cms.manage_media`, `manage_site_settings`, `manage_pages`, `publish_pages`, `manage_menus`, `manage_blog`, `publish_blog` and `view_newsletter_subscribers`.
+Custom permissions: `cms.manage_media`, `manage_site_settings`, `manage_pages`, `publish_pages`, `manage_menus`, `manage_blog`, `publish_blog`, `view_newsletter_subscribers` and `manage_notices` (content editors have it).
 
 ## Catalog and learning tables (M3)
 

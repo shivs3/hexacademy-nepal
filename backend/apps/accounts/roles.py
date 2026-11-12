@@ -50,6 +50,7 @@ ROLES: dict[str, Role] = {
             "cms.manage_blog",
             "cms.publish_blog",
             "cms.view_newsletter_subscribers",
+            "cms.manage_notices",
             "catalog.manage_catalog",
             "catalog.publish_courses",
             "certificates.manage_certificates",

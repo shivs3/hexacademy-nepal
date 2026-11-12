@@ -329,6 +329,87 @@ class BlogPost(TimeStampedModel, SeoFields):
         return self.title
 
 
+def notice_page_upload_to(instance: "NoticePage", filename: str) -> str:
+    now = timezone.now()
+    return f"notices/{now:%Y}/{now:%m}/{uuid.uuid4().hex}.webp"
+
+
+class Notice(TimeStampedModel):
+    """A notice shown in the site pop-up and on /notices.
+
+    The attachment is an image or a PDF from the media library. PDF pages are
+    rendered to images (NoticePage) when the notice is saved, so the site can
+    show them inline instead of handing the file to the browser's PDF viewer.
+    """
+
+    title = models.CharField(max_length=200)
+    summary = models.CharField(max_length=500, blank=True, help_text="Short message shown in the pop-up.")
+    body = models.TextField(blank=True, help_text="Full details (sanitised HTML).")
+    attachment = models.ForeignKey(MediaAsset, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    # The attachment the stored NoticePage images were rendered from.
+    rendered_attachment = models.ForeignKey(
+        MediaAsset, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    is_active = models.BooleanField(default=True)
+    show_in_popup = models.BooleanField(default=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    position = models.PositiveIntegerField(default=0, help_text="Lower numbers are shown first.")
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["position", "-created_at"]
+        indexes = [models.Index(fields=["is_active", "starts_at", "ends_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(starts_at__isnull=True) | Q(ends_at__isnull=True) | Q(ends_at__gt=models.F("starts_at")),
+                name="cms_notice_ends_after_start",
+            )
+        ]
+        permissions = [("manage_notices", "Can create, edit and remove site notices")]
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def live_q(cls, now=None) -> Q:
+        now = now or timezone.now()
+        return (
+            Q(is_active=True)
+            & (Q(starts_at__isnull=True) | Q(starts_at__lte=now))
+            & (Q(ends_at__isnull=True) | Q(ends_at__gt=now))
+        )
+
+    def is_live(self, now=None) -> bool:
+        now = now or timezone.now()
+        if not self.is_active or (self.starts_at and now < self.starts_at):
+            return False
+        return not (self.ends_at and now >= self.ends_at)
+
+
+class NoticePage(models.Model):
+    """One rendered page of a notice's PDF attachment."""
+
+    notice = models.ForeignKey(Notice, on_delete=models.CASCADE, related_name="pages")
+    number = models.PositiveSmallIntegerField()
+    image = models.FileField(upload_to=notice_page_upload_to, max_length=255)
+    width = models.PositiveIntegerField()
+    height = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["number"]
+        constraints = [models.UniqueConstraint(fields=["notice", "number"], name="cms_noticepage_unique_number")]
+
+    def __str__(self):
+        return f"{self.notice_id} p{self.number}"
+
+
 class NewsletterSubscriber(models.Model):
     email = models.EmailField(max_length=254)
     source = models.CharField(max_length=200, blank=True, help_text="Page path where the visitor signed up.")

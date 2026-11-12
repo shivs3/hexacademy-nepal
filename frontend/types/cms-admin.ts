@@ -1,4 +1,4 @@
-import type { MediaRef } from "./cms";
+import type { MediaRef, NoticeAttachment, NoticePage } from "./cms";
 
 /** Staff-only CMS shapes (apps/cms/admin_serializers.py). */
 
@@ -220,4 +220,24 @@ export type CmsOverview = {
   posts_published: number;
   posts_draft: number;
   media: number;
+};
+
+export type AdminNotice = {
+  id: number;
+  title: string;
+  summary: string;
+  body: string;
+  attachment: number | null;
+  attachment_detail: (NoticeAttachment & { id: number }) | null;
+  pages: NoticePage[];
+  is_active: boolean;
+  show_in_popup: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  position: number;
+  is_live: boolean;
+  /** Active but its start time has not come yet. */
+  is_upcoming: boolean;
+  created_at: string;
+  updated_at: string;
 };

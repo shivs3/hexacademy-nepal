@@ -53,6 +53,8 @@ None of these endpoints ever return drafts, archived content, scheduled posts be
 | GET | `/blog/posts/` | `?category=<slug>&page=`. Published posts whose `published_at` has passed |
 | GET | `/blog/posts/{slug}/` | |
 | GET | `/blog/categories/` | |
+| GET | `/notices/` | Live notices (active and inside their window) in display order, at most 50, unpaginated. Each has `title`, `summary`, `attachment` (image or PDF), `pages` (the PDF rendered to images), `show_in_popup`, `has_details` |
+| GET | `/notices/{id}/` | One live notice plus its sanitised `body`. 404 when off, not started or ended |
 | GET | `/seo/sitemap/` | Paths and last-modified dates for the Next sitemap. Pages marked `noindex` are excluded |
 | POST | `/newsletter/subscribe/` | `{email, consent: true, source}`, throttled 10/hour. Always 202, so it never reveals whether the email is already subscribed |
 
@@ -70,6 +72,8 @@ None of these endpoints ever return drafts, archived content, scheduled posts be
 | GET/POST | `/admin/cms/media/` | List: any CMS editing permission. Upload (multipart `file`, `title`, `alt_text`): manage_media |
 | GET/PATCH/DELETE | `/admin/cms/media/{id}/` | PATCH and DELETE: manage_media. A PATCH may change only `title` and `alt_text` |
 | GET/PATCH | `/admin/cms/site-settings/` | manage_site_settings |
+| GET/POST | `/admin/cms/notices/` | manage_notices. `?search= ?is_active= ?show_in_popup=`. A PDF attachment (max 10 pages) is rendered to WebP page images on save; an unreadable or longer PDF is a 400 on `attachment` |
+| GET/PATCH/DELETE | `/admin/cms/notices/{id}/` | manage_notices. Responses add `is_live` and `is_upcoming` |
 | GET | `/admin/cms/menus/` | manage_menus |
 | GET/PUT | `/admin/cms/menus/{location}/` | manage_menus. A PUT replaces the whole tree `{title, items: [{label, page?, url?, open_in_new_tab, is_visible, children: […]}]}`, with at most 60 links |
 | GET/POST | `/admin/cms/blog/posts/` | manage_blog. `?search= ?status=` |

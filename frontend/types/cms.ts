@@ -159,3 +159,31 @@ export type SitemapData = {
   pages: { path: string; updated_at: string }[];
   posts: { path: string; updated_at: string }[];
 };
+
+export type NoticeAttachment = {
+  kind: "image" | "document";
+  url: string;
+  mime_type: string;
+  width: number | null;
+  height: number | null;
+  alt: string;
+  original_name: string;
+  size_bytes: number;
+};
+
+/** A rendered page of a notice's PDF (an image on the media host). */
+export type NoticePage = { number: number; url: string; width: number; height: number };
+
+export type Notice = {
+  id: number;
+  title: string;
+  summary: string;
+  has_details: boolean;
+  attachment: NoticeAttachment | null;
+  pages: NoticePage[];
+  show_in_popup: boolean;
+  published_at: string;
+  updated_at: string;
+};
+
+export type NoticeDetail = Notice & { body: string };

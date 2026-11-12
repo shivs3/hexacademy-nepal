@@ -43,6 +43,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (hasPerm(user, "cms.manage_blog")) website.push({ href: "/admin/cms/blog", label: "Blog", icon: "blog" });
   if (hasAnyPerm(user, ["cms.manage_media", "cms.manage_pages", "cms.manage_blog", "cms.manage_site_settings"]))
     website.push({ href: "/admin/cms/media", label: "Media library", icon: "media" });
+  if (hasPerm(user, "cms.manage_notices")) website.push({ href: "/admin/cms/notices", label: "Notices", icon: "notices" });
   if (hasPerm(user, "cms.manage_menus")) website.push({ href: "/admin/cms/menus", label: "Menus", icon: "menus" });
   if (hasPerm(user, "cms.manage_site_settings")) website.push({ href: "/admin/cms/settings", label: "Site settings", icon: "settings" });
   if (hasPerm(user, "cms.view_newsletter_subscribers"))

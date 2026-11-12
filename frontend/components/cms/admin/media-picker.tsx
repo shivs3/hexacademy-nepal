@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Search, Upload, X } from "lucide-react";
+import { FileText, ImageIcon, Search, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import type { MediaRef } from "@/types/cms";
 import type { MediaAsset } from "@/types/cms-admin";
 
 export const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
+export const IMAGE_OR_PDF_ACCEPT = `${IMAGE_ACCEPT},application/pdf`;
 
 export function toMediaRef(asset: MediaAsset): MediaRef {
   return {
@@ -36,17 +37,20 @@ export async function uploadMedia(file: File, extra: { title?: string; alt_text?
   return api.post<MediaAsset>("/admin/cms/media/", form);
 }
 
-/** Browse the image library (and upload, when permitted) to pick one image. */
+/** Browse the media library (and upload, when permitted) to pick one image, or one image or PDF. */
 export function MediaPickerDialog({
   open,
   onOpenChange,
   onSelect,
   canUpload = true,
+  allowPdf = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (asset: MediaAsset) => void;
   canUpload?: boolean;
+  /** Also list and accept PDF documents. */
+  allowPdf?: boolean;
 }) {
   const toast = useToast();
   const [search, setSearch] = useState("");
@@ -70,7 +74,7 @@ export function MediaPickerDialog({
     const controller = new AbortController();
     api
       .get<Paginated<MediaAsset>>("/admin/cms/media/", {
-        query: { kind: "image", search: query, page, page_size: 24 },
+        query: { kind: allowPdf ? undefined : "image", search: query, page, page_size: 24 },
         signal: controller.signal,
       })
       .then((res) => {
@@ -81,18 +85,18 @@ export function MediaPickerDialog({
         if (!controller.signal.aborted) setError(errorMessage(err));
       });
     return () => controller.abort();
-  }, [open, query, page]);
+  }, [open, query, page, allowPdf]);
 
   async function handleUpload(file: File | undefined) {
     if (!file) return;
     setUploading(true);
     try {
       const asset = await uploadMedia(file, { title: file.name.replace(/\.[^.]+$/, "") });
-      if (asset.kind !== "image") {
+      if (asset.kind !== "image" && !allowPdf) {
         toast.error("That file is not an image.");
         return;
       }
-      toast.success("Image uploaded. Remember to add alt text in the media library.");
+      toast.success(asset.kind === "image" ? "Image uploaded. Remember to add alt text in the media library." : "PDF uploaded.");
       onSelect(asset);
       onOpenChange(false);
     } catch (err) {
@@ -104,7 +108,7 @@ export function MediaPickerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Choose an image" className="max-w-3xl">
+    <Dialog open={open} onOpenChange={onOpenChange} title={allowPdf ? "Choose an image or PDF" : "Choose an image"} className="max-w-3xl">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
@@ -114,7 +118,7 @@ export function MediaPickerDialog({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search title, alt text or file name"
-              aria-label="Search images"
+              aria-label={allowPdf ? "Search files" : "Search images"}
               className="pl-9"
             />
           </div>
@@ -123,7 +127,7 @@ export function MediaPickerDialog({
               <input
                 ref={fileRef}
                 type="file"
-                accept={IMAGE_ACCEPT}
+                accept={allowPdf ? IMAGE_OR_PDF_ACCEPT : IMAGE_ACCEPT}
                 className="sr-only"
                 tabIndex={-1}
                 aria-hidden="true"
@@ -146,7 +150,7 @@ export function MediaPickerDialog({
             ))}
           </div>
         ) : data && data.results.length === 0 ? (
-          <EmptyState icon={ImageIcon} title={query ? "No images match your search" : "The media library has no images yet"} />
+          <EmptyState icon={ImageIcon} title={query ? "Nothing matches your search" : allowPdf ? "The media library is empty" : "The media library has no images yet"} />
         ) : data ? (
           <>
             <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -160,10 +164,17 @@ export function MediaPickerDialog({
                     }}
                     className="group block w-full overflow-hidden rounded-lg border border-line bg-page text-left focus-visible:outline-2 focus-visible:outline-teal"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- library thumbnails of arbitrary size */}
-                    <img src={asset.url} alt="" className="aspect-square w-full object-cover transition group-hover:opacity-90" />
+                    {asset.kind === "image" ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- library thumbnails of arbitrary size
+                      <img src={asset.url} alt="" className="aspect-square w-full object-cover transition group-hover:opacity-90" />
+                    ) : (
+                      <span className="flex aspect-square w-full flex-col items-center justify-center gap-1 text-muted group-hover:text-teal-700">
+                        <FileText className="h-8 w-8" aria-hidden="true" />
+                        <span className="text-xs font-medium">PDF</span>
+                      </span>
+                    )}
                     <span className="block truncate px-2 py-1.5 text-xs text-body">{asset.title || asset.original_name}</span>
-                    {!asset.alt_text && <span className="block px-2 pb-1.5 text-[0.7rem] text-warning">No alt text</span>}
+                    {asset.kind === "image" && !asset.alt_text && <span className="block px-2 pb-1.5 text-[0.7rem] text-warning">No alt text</span>}
                   </button>
                 </li>
               ))}

@@ -12,6 +12,7 @@ celery==5.6.3
 redis==8.1.0
 nh3==0.3.7
 pillow==13.0.0
+pypdfium2==5.15.2
 openpyxl==3.1.5
 reportlab==5.0.1
 gunicorn==26.2.0
