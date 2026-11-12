@@ -1,3 +1,4 @@
+import threading
 from datetime import timedelta
 from io import BytesIO
 
@@ -11,6 +12,7 @@ from apps.accounts import roles
 from apps.audit.models import AuditLog
 from apps.cms.media import create_media_asset
 from apps.cms.models import Notice, NoticePage
+from apps.cms.notices import MAX_PDF_PAGES
 
 pytestmark = pytest.mark.django_db
 ADMIN = "/api/v1/admin/cms/notices/"
@@ -73,7 +75,7 @@ def test_bad_and_long_pdfs_are_refused(editor):
     assert res.status_code == 400
     assert "attachment" in res.json()["error"]["details"]
 
-    long = create_media_asset(make_pdf(11))
+    long = create_media_asset(make_pdf(MAX_PDF_PAGES + 1))
     res = editor.post(ADMIN, {"title": "T", "attachment": long.pk}, format="json")
     assert res.status_code == 400
     assert not Notice.objects.exists()
@@ -149,3 +151,33 @@ def test_delete_removes_notice_and_pages(editor, pdf, django_capture_on_commit_c
     assert not Notice.objects.exists() and not NoticePage.objects.exists()
     assert not storage.exists(name)
     assert AuditLog.objects.filter(action="cms.notice_deleted").exists()
+
+
+def test_a_pdf_at_the_page_limit_renders_every_page_in_order(editor):
+    full = create_media_asset(make_pdf(MAX_PDF_PAGES))
+    notice = create(editor, attachment=full.pk)
+    assert [p["number"] for p in notice["pages"]] == list(range(1, MAX_PDF_PAGES + 1))
+    names = list(NoticePage.objects.values_list("image", flat=True))
+    assert len(set(names)) == MAX_PDF_PAGES
+
+
+def test_a_failed_upload_leaves_no_page_files_behind(editor, pdf, monkeypatch):
+    storage = NoticePage._meta.get_field("image").storage
+    real_save, saved, calls, lock = storage.save, [], [], threading.Lock()
+
+    def flaky_save(name, content, **kw):
+        with lock:
+            calls.append(name)
+            nth = len(calls)
+        if nth == 2:  # the first upload succeeds, the second fails
+            raise OSError("storage unavailable")
+        stored = real_save(name, content, **kw)
+        saved.append(stored)
+        return stored
+
+    monkeypatch.setattr(storage, "save", flaky_save)
+    editor.raise_request_exception = False
+    res = editor.post(ADMIN, {"title": "T", "attachment": pdf.pk}, format="json")
+    assert res.status_code == 500
+    assert saved and not any(storage.exists(n) for n in saved)
+    assert not Notice.objects.exists() and not NoticePage.objects.exists()

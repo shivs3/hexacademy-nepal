@@ -471,9 +471,10 @@ Update this file at the end of every milestone. Only record what was actually ex
 
 ## Notices with a pop-up (2026-11-12)
 
-- Admin → Website → **Notices** (permission `cms.manage_notices`, included in content editor). Each notice has a title, short message, an optional image or PDF (≤10 pages), optional full details, active and pop-up switches, a Nepal-time show from/until window, and an order.
+- Admin → Website → **Notices** (permission `cms.manage_notices`, included in content editor). Each notice has a title, short message, an optional image or PDF (≤30 pages), optional full details, active and pop-up switches, a Nepal-time show from/until window, and an order.
 - PDFs become page images on save (ADR above). Live notices appear in a pop-up on public pages (several notices get previous/next). Closing hides it for the visit; "Don't show again" is remembered per notice version in the browser; a "Notices" button reopens it. `/notices` lists them and `/notices/{id}` shows the image or every PDF page full width inside the site, plus a download link.
 - Verified: backend tests (`apps/cms/tests/test_notices.py`), ruff, OpenAPI validation, frontend typecheck, lint, 136 unit tests and the production build. Checked in a browser locally (desktop and mobile) with a two-page PDF: pop-up, full notice page, admin list and editor.
+- Page limit raised from 10 to 30 after making rendering faster: measured on the VPS, a dense 30-page PDF takes ~16 s (render 5 s, upload 11 s) against the 60 s request limit.
 - Deploy needs `pip install -r requirements.txt` (adds `pypdfium2`) before `migrate` (`cms.0003_notices`).
 
 ## How to continue

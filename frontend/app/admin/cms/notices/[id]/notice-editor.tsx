@@ -223,7 +223,7 @@ export function NoticeEditor({ noticeId, canUpload }: { noticeId: number | null;
                 {errors.attachment ? (
                   <p className="text-xs text-danger">{errors.attachment}</p>
                 ) : (
-                  <p className="text-xs text-muted">Shown in full on the notice page. PDFs (up to 10 pages) are turned into page images when you save.</p>
+                  <p className="text-xs text-muted">Shown in full on the notice page. PDFs (up to 30 pages) are turned into page images when you save.</p>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
