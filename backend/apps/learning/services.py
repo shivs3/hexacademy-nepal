@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.accounts.services import require_verified_email
 from apps.audit import services as audit
 from apps.catalog import policies
 from apps.catalog.models import Course, Lesson
@@ -105,6 +106,7 @@ def enroll_free(user, course: Course, *, request=None) -> tuple[Enrollment, bool
         raise DomainError("This course is not open for enrollment.", code="not_available", status_code=404)
     if not course.is_free():
         raise DomainError("This course is paid. Purchase it to enroll.", code="payment_required", status_code=402)
+    require_verified_email(user, "enroll")
     existing = Enrollment.objects.filter(user=user, course=course).first()
     if existing and existing.status == Enrollment.Status.REVOKED:
         # A revoked learner must be reinstated by staff, not by re-enrolling.

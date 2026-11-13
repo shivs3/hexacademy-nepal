@@ -3,12 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { VerifyEmailNotice } from "@/components/account/verify-email-notice";
 import { RichText } from "@/components/cms/rich-text";
 import { StartExamButton } from "@/components/exams/start-exam-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, Badge, PageHeader } from "@/components/ui/feedback";
 import { serverGetOrNull } from "@/lib/api/server";
+import { requireUser } from "@/lib/auth";
 import { ATTEMPT_STATUS, AVAILABILITY_TEXT, EXAM_KIND_LABEL, attemptsLeftText, formatMarks } from "@/lib/assessments";
 import { formatDateTime } from "@/lib/utils";
 import type { LearnerExamDetail } from "@/types/assessments";
@@ -22,7 +24,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ExamDetailPage({ params }: Props) {
   const { slug } = await params;
-  const exam = await serverGetOrNull<LearnerExamDetail>(`/exams/${slug}/`);
+  const [user, exam] = await Promise.all([
+    requireUser(`/dashboard/exams/${slug}`),
+    serverGetOrNull<LearnerExamDetail>(`/exams/${slug}/`),
+  ]);
   if (!exam) notFound();
 
   const rules = [
@@ -110,6 +115,8 @@ export default async function ExamDetailPage({ params }: Props) {
             {exam.closes_at && <p className="text-sm text-muted">Closes {formatDateTime(exam.closes_at)}</p>}
             {exam.availability === "available" || exam.availability === "in_progress" ? (
               <StartExamButton slug={exam.slug} resumeId={exam.open_attempt_id} />
+            ) : exam.availability === "email_unverified" ? (
+              <VerifyEmailNotice email={user.email}>This is a formal exam, so it needs a verified email address.</VerifyEmailNotice>
             ) : exam.availability === "not_enrolled" && exam.course ? (
               <>
                 <Alert tone="info">Enroll in the course to take this exam.</Alert>

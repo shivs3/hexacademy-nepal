@@ -270,3 +270,14 @@ def test_enrollment_course_options_are_scoped(client_for, make_course):
     assert {c["id"] for c in support.get(url).json()} == {own.pk, other.pk, archived.pk}
     assert [c["id"] for c in teacher.get(url).json()] == [own.pk]
     assert client_for(roles.STUDENT).get(url).status_code == 403
+
+
+def test_unverified_learner_cannot_enroll_until_verified(client_for, make_course, settings):
+    course = make_course()
+    learner = client_for(verified=False)
+    res = learner.post(f"/api/v1/courses/{course.slug}/enroll/")
+    assert res.status_code == 403 and res.json()["error"]["code"] == "email_unverified"
+    assert not Enrollment.objects.filter(user=learner.user).exists()
+
+    settings.EMAIL_VERIFICATION_REQUIRED = False
+    assert learner.post(f"/api/v1/courses/{course.slug}/enroll/").status_code == 201

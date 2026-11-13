@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { VerifyEmailNotice, isUnverifiedError } from "@/components/account/verify-email-notice";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Alert } from "@/components/ui/feedback";
@@ -17,6 +18,7 @@ export function StartExamButton({ slug, resumeId }: { slug: string; resumeId: nu
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState(false);
 
   if (resumeId) {
     return (
@@ -33,7 +35,8 @@ export function StartExamButton({ slug, resumeId }: { slug: string; resumeId: nu
       const attempt = await api.post<Attempt>(`/exams/${slug}/attempts/`);
       router.push(`/exam/${attempt.id}`);
     } catch (err) {
-      setError(errorMessage(err));
+      if (isUnverifiedError(err)) setUnverified(true);
+      else setError(errorMessage(err));
       setConfirming(false);
       setBusy(false);
     }
@@ -41,6 +44,7 @@ export function StartExamButton({ slug, resumeId }: { slug: string; resumeId: nu
 
   return (
     <>
+      {unverified && <VerifyEmailNotice>You need a verified email address to take this exam.</VerifyEmailNotice>}
       {error && <Alert tone="danger">{error}</Alert>}
       <Button onClick={() => setConfirming(true)}>Start exam</Button>
       <ConfirmDialog

@@ -153,6 +153,15 @@ Production checks: the beat container must run (class reminders go out every 5 m
 
 In-app notifications always work. Email copies (class reminders, reschedules and cancellations, graded or returned assignments, issued certificates) go to verified addresses through the Celery worker. Set the `EMAIL_*` variables and `DEFAULT_FROM_EMAIL` from `.env.example` with a transactional mail provider, and set up SPF, DKIM and DMARC for the sending domain. `FRONTEND_URL` must be the public site address: it is printed on certificates as the verification link.
 
+### Zoho Mail (the chosen provider)
+
+1. In Zoho Mail, create the sending mailbox or an alias such as `no-reply@hexacademynepal.com` (the From address must be the mailbox or one of its aliases, or Zoho rejects the message).
+2. If the account uses two-factor sign-in, create an **app-specific password** (Zoho Accounts → Security → App Passwords) and use it as `EMAIL_HOST_PASSWORD`.
+3. Use the SMTP host for your Zoho data centre, as shown in Zoho Mail → Settings → Mail Accounts → SMTP (for example `smtp.zoho.com`, `smtp.zoho.in` or `smtp.zoho.eu`; `smtppro.` hosts for paid organisation accounts). Port 465 with `EMAIL_USE_SSL=true`, `EMAIL_USE_TLS=false`, or port 587 with `EMAIL_USE_TLS=true`, `EMAIL_USE_SSL=false`.
+4. In Cloudflare DNS add the SPF (`include:zoho.com` or the regional value Zoho shows), DKIM and DMARC records from Zoho Mail Admin → Domains → Email Configuration. Mail records must be **DNS only** (grey cloud).
+5. Set `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, the host, port, user and password in `backend/.env`, restart the backend and worker, and send a test with `python manage.py sendtestemail you@example.com`.
+6. Only after a real email arrives, set `EMAIL_VERIFICATION_REQUIRED=true` and restart. Until then keep it `false`, or new learners could not buy, enroll or take formal exams.
+
 ## Certificates
 
 Certificate PDFs use reportlab's built-in fonts, which cover Latin text only. Names written in Devanagari will not render correctly in the PDF (the verify page shows them fine). Before issuing to learners with non-Latin names, bundle a font with Devanagari coverage (for example Noto Sans Devanagari, SIL Open Font License) and register it in `apps/certificates/pdf.py`.

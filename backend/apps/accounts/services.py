@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import default_token_generator
 from django.core import signing
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -16,9 +17,10 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from apps.audit import services as audit
 from common.exceptions import DomainError
 
-from . import roles
+from . import emails, roles
 from .models import UserProfile
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 _VERIFY_SALT = "accounts.email-verification"
 
@@ -43,18 +45,40 @@ def make_verification_token(user) -> str:
     return signing.dumps({"uid": user.pk, "email": user.email}, salt=_VERIFY_SALT)
 
 
-def send_verification_email(user) -> None:
-    link = f"{settings.FRONTEND_URL}/verify-email?token={make_verification_token(user)}"
-    send_mail(
-        subject="Verify your Hexacademy Nepal email",
-        message=(
-            f"Hello {user.get_short_name()},\n\n"
-            f"Please confirm your email address by opening this link:\n{link}\n\n"
-            "If you did not create an account, you can ignore this email."
-        ),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-    )
+def _enqueue(task, user_id: int) -> bool:
+    """Hand an email to the worker. A broker outage is logged, not shown to the user as a crash."""
+    try:
+        task.delay(user_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not queue %s for user %s", task.name, user_id)
+        return False
+    return True
+
+
+def send_verification_email(user) -> bool:
+    from . import tasks
+
+    return _enqueue(tasks.send_verification_email, user.pk)
+
+
+def deliver_verification_email(user) -> None:
+    """Build and send the email now (called by the worker)."""
+    emails.send_verification(user, f"{settings.FRONTEND_URL}/verify-email?token={make_verification_token(user)}")
+
+
+def verification_required() -> bool:
+    return settings.EMAIL_VERIFICATION_REQUIRED
+
+
+def require_verified_email(user, action: str) -> None:
+    """Refuse `action` (e.g. "buy a course") until the learner has verified their email."""
+    if verification_required() and not user.email_verified:
+        raise DomainError(
+            f"Please verify your email address before you {action}. "
+            f"We sent a link to {user.email}; you can ask for a new one.",
+            code="email_unverified",
+            status_code=403,
+        )
 
 
 def verify_email(token: str) -> User:
@@ -82,20 +106,17 @@ def request_password_reset(email: str, request=None) -> None:
     user = User.objects.filter(email__iexact=email.strip(), is_active=True).first()
     if user is None:
         return
+    from . import tasks
+
+    _enqueue(tasks.send_password_reset_email, user.pk)
+    audit.record("account.password_reset_requested", actor=user, target=user, request=request)
+
+
+def deliver_password_reset(user) -> None:
+    """Build and send the reset email now (called by the worker)."""
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-    send_mail(
-        subject="Reset your Hexacademy Nepal password",
-        message=(
-            f"Hello {user.get_short_name()},\n\n"
-            f"Use this link to choose a new password (valid for 2 hours):\n{link}\n\n"
-            "If you did not request this, you can ignore this email."
-        ),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-    )
-    audit.record("account.password_reset_requested", actor=user, target=user, request=request)
+    emails.send_password_reset(user, f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}")
 
 
 def confirm_password_reset(*, uid: str, token: str, new_password: str, request=None) -> User:

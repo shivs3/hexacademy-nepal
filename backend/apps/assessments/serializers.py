@@ -88,7 +88,15 @@ class LearnerExamSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(
         serializers.ChoiceField(
-            choices=["available", "in_progress", "not_open", "closed", "not_enrolled", "no_attempts_left"]
+            choices=[
+                "available",
+                "in_progress",
+                "not_open",
+                "closed",
+                "not_enrolled",
+                "email_unverified",
+                "no_attempts_left",
+            ]  # fmt: skip
         )
     )
     def get_availability(self, obj):

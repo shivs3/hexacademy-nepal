@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.services import require_verified_email
 from apps.audit import services as audit
 from apps.cms import sanitize
 from apps.learning import services as learning
@@ -96,6 +97,7 @@ def _release_coupon(order: Order) -> None:
 @transaction.atomic
 def create_order(user, slugs: list[str], coupon_code: str = "", *, request=None) -> Order:
     # The coupon row lock serialises redemptions so usage limits hold under concurrency.
+    require_verified_email(user, "buy a course")
     q = pricing.quote(user, slugs, coupon_code, lock_coupon=True)
     courses = [line.course for line in q.lines]
     _check_learner_can_buy(user, courses)
@@ -230,6 +232,7 @@ def _event(payment: Payment, kind: str, *, source: str, data: dict | None = None
 
 def initiate_payment(order: Order, provider_key: str, *, request=None):
     """Creates a Payment and asks the provider how to collect it. Returns (payment, Initiation | None)."""
+    require_verified_email(order.user, "pay for a course")
     method = _method_or_error(provider_key)
     with transaction.atomic():
         order = Order.objects.select_for_update().get(pk=order.pk)

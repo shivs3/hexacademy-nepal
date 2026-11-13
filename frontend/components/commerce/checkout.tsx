@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { VerifyEmailNotice, isUnverifiedError } from "@/components/account/verify-email-notice";
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ export function Checkout({ courseSlug }: { courseSlug: string }) {
   const [chosen, setChosen] = useState<PaymentProvider | null>(null);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState(false);
   const methods = useApiResource<PaymentMethods>("/payments/methods/");
 
   useEffect(() => {
@@ -78,6 +80,7 @@ export function Checkout({ courseSlug }: { courseSlug: string }) {
   async function pay() {
     setPaying(true);
     setPayError(null);
+    setUnverified(false);
     try {
       // Prices are recomputed by the server here; the quote above is only a preview.
       const order = await api.post<MyOrder>("/orders/", { courses: [courseSlug], coupon_code: coupon });
@@ -91,7 +94,8 @@ export function Checkout({ courseSlug }: { courseSlug: string }) {
       if (outcome === "manual") router.push(`/dashboard/orders/${encodeURIComponent(order.number)}?new=1`);
       // Otherwise the browser is on its way to the provider; keep the button busy.
     } catch (err) {
-      setPayError(err instanceof Error && !isApiError(err) ? err.message : errorMessage(err));
+      if (isUnverifiedError(err)) setUnverified(true);
+      else setPayError(err instanceof Error && !isApiError(err) ? err.message : errorMessage(err));
       setPaying(false);
     }
   }
@@ -118,6 +122,7 @@ export function Checkout({ courseSlug }: { courseSlug: string }) {
           ) : (
             <MethodPicker data={methods.data} error={methods.error} total={total} value={method} onChange={setChosen} />
           )}
+          {unverified && <VerifyEmailNotice>You need a verified email address to buy a course.</VerifyEmailNotice>}
           {payError && <Alert tone="danger">{payError}</Alert>}
           <div className="flex flex-col gap-2">
             <Button size="lg" onClick={pay} loading={paying} disabled={!quote || (!free && !method)}>

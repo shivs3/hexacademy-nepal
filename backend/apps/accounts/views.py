@@ -168,7 +168,12 @@ class EmailVerifyResendView(APIView):
     def post(self, request):
         if request.user.email_verified:
             return Response({"detail": "Your email address is already verified."})
-        services.send_verification_email(request.user)
+        if not services.send_verification_email(request.user):
+            raise DomainError(
+                "We couldn't send the email right now. Please try again shortly.",
+                code="email_unavailable",
+                status_code=503,
+            )
         return Response({"detail": "A new verification email has been sent."}, status=status.HTTP_202_ACCEPTED)
 
 

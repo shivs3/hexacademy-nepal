@@ -9,7 +9,7 @@ export type ExamKind = "practice" | "formal";
 export type ExamStatus = "draft" | "published" | "closed";
 export type ResultRelease = "immediate" | "after_close" | "manual";
 export type AttemptStatus = "in_progress" | "submitted" | "expired";
-export type Availability = "available" | "in_progress" | "not_open" | "closed" | "not_enrolled" | "no_attempts_left";
+export type Availability = "available" | "in_progress" | "not_open" | "closed" | "not_enrolled" | "email_unverified" | "no_attempts_left";
 
 // --- Learner -----------------------------------------------------------------
 

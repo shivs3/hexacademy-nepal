@@ -15,6 +15,7 @@
 - Login errors are generic (`invalid_credentials`), and password reset never reveals whether an account exists.
 - Throttling: login 10/min per IP **and** per email, register 5/min, password reset 5/hour, verification 10/hour. Nginx adds a coarse per-IP limit on `/api/v1/auth/`.
 - Password reset tokens are single-use (Django's token generator, invalidated when the password changes) and expire after 2 hours. Email verification tokens are signed with a dedicated salt and expire after 3 days.
+- Email verification is enforced on the server (`accounts.services.require_verified_email`) for creating an order, starting a payment, free enrollment and starting a formal exam. Unverified accounts can still sign in, browse, use practice tests and resend the link. The switch is `EMAIL_VERIFICATION_REQUIRED` (default on). Verification and reset emails are sent by the Celery worker with retries, so a slow mail server never blocks a request; their bodies (which contain tokens) are never logged.
 - Changing a password keeps the current session and invalidates all others. Deactivating an account ends all of its sessions immediately.
 
 ## Authorisation

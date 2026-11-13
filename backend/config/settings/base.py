@@ -256,7 +256,9 @@ EMAIL_HOST = env("EMAIL_HOST", default="localhost")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)  # STARTTLS, usually port 587
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)  # implicit TLS, usually port 465; set TLS false then
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=20)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Hexacademy Nepal <no-reply@hexacademynepal.com>")
 
 # Public URL of the Next.js frontend, used in emails (verification, reset links).
@@ -264,6 +266,8 @@ FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000").rstrip("/")
 
 # Token lifetimes
 EMAIL_VERIFICATION_TIMEOUT = timedelta(days=3)
+# Learners must verify their email before buying, enrolling or starting a formal exam.
+EMAIL_VERIFICATION_REQUIRED = env.bool("EMAIL_VERIFICATION_REQUIRED", default=True)
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 2
 
 # --- Celery

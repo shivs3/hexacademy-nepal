@@ -136,6 +136,23 @@ describe("Checkout", () => {
     expect(screen.getByRole("link", { name: "Back to the course" })).toHaveAttribute("href", "/courses/intro-python");
   });
 
+  it("asks an unverified learner to verify and resends the link in place", async () => {
+    routes({
+      "/orders/quote/": () => quote(),
+      "/orders/": () => {
+        throw new ApiError(403, "email_unverified", "Please verify your email address before you buy a course.");
+      },
+      "/auth/verify-email/resend/": () => ({ detail: "A new verification email has been sent." }),
+    });
+    render(<Checkout courseSlug="intro-python" />);
+    await userEvent.click(await screen.findByRole("button", { name: /continue to payment/i }));
+    expect(await screen.findByText("Verify your email address")).toBeInTheDocument();
+    expect(goToProvider).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Send a new link" }));
+    expect(await screen.findByText(/A new verification email has been sent/)).toBeInTheDocument();
+    expect(post).toHaveBeenLastCalledWith("/auth/verify-email/resend/");
+  });
+
   it("disables gateways below their minimum amount", async () => {
     routes({ "/orders/quote/": () => quote({ subtotal: "5.00", total: "5.00", items: [{ ...line, list_price: "5.00", unit_price: "5.00", total: "5.00" }] }) });
     render(<Checkout courseSlug="intro-python" />);

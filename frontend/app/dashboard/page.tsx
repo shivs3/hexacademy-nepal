@@ -2,8 +2,9 @@ import { Award, BookOpen, MailWarning } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { VerifyEmailNotice } from "@/components/account/verify-email-notice";
 import { Button } from "@/components/ui/button";
-import { Alert, EmptyState, PageHeader } from "@/components/ui/feedback";
+import { EmptyState, PageHeader } from "@/components/ui/feedback";
 import { AttemptHistory } from "@/components/exams/attempt-history";
 import { ExamCard } from "@/components/exams/exam-card";
 import { EnrolledCourseCard } from "@/components/learning/enrolled-course-card";
@@ -39,13 +40,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title={welcome ? `Welcome, ${firstName}!` : `Hello, ${firstName}`} description="Your learning at a glance." />
       {!user.email_verified && (
-        <Alert tone="warning" title="Verify your email address" className="mb-6">
-          We sent a verification link to <strong>{user.email}</strong>. Verifying lets you receive class reminders and
-          certificates.{" "}
-          <Link href="/dashboard/profile" className="font-medium underline">
-            Resend the link
-          </Link>
-        </Alert>
+        <VerifyEmailNotice email={user.email} className="mb-6">
+          Verify your email address to buy courses, enroll, take formal exams and receive class reminders and
+          certificates.
+        </VerifyEmailNotice>
       )}
       {enrollments.count === 0 ? (
         <EmptyState

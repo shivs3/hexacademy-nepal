@@ -27,6 +27,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.services import verification_required
 from apps.audit import services as audit
 from apps.learning.services import active_enrollment
 from common.exceptions import ConflictError, DomainError
@@ -51,7 +52,8 @@ def attempts_used(user, exam: Exam) -> int:
 def eligibility(
     user, exam: Exam, *, now=None, enrolled: bool | None = None, used: int | None = None
 ) -> tuple[bool, str]:
-    """(allowed, reason). Reasons: unavailable, not_open, closed, not_enrolled, no_attempts_left.
+    """(allowed, reason). Reasons: unavailable, not_open, closed, not_enrolled, email_unverified,
+    no_attempts_left. Practice tests don't need a verified email; formal exams do.
 
     List views may pass `enrolled` and `used` when they have already loaded
     them for every row; otherwise each is queried here.
@@ -68,6 +70,8 @@ def eligibility(
             enrolled = active_enrollment(user, exam.course) is not None
         if not enrolled:
             return False, "not_enrolled"
+    if exam.kind == Exam.Kind.FORMAL and verification_required() and not user.email_verified:
+        return False, "email_unverified"
     if exam.max_attempts is not None and (attempts_used(user, exam) if used is None else used) >= exam.max_attempts:
         return False, "no_attempts_left"
     return True, ""
@@ -78,6 +82,7 @@ DENIALS = {
     "not_open": (403, "This exam has not opened yet."),
     "closed": (403, "This exam has closed."),
     "not_enrolled": (403, "Enroll in the course to take this exam."),
+    "email_unverified": (403, "Verify your email address to take this exam."),
     "no_attempts_left": (403, "You have used all your attempts for this exam."),
 }
 

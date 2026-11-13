@@ -173,3 +173,36 @@ def test_error_envelope_for_unauthenticated(api_client):
     res = api_client.get("/api/v1/users/me/")
     assert res.status_code == 403
     assert res.data["error"]["code"] == "not_authenticated"
+
+
+def test_verification_email_has_text_and_html_with_the_link(make_user, django_capture_on_commit_callbacks):
+    from apps.accounts import services as account_services
+
+    user = make_user(verified=False, full_name="<b>Sita</b> Sharma")
+    with django_capture_on_commit_callbacks(execute=True):
+        assert account_services.send_verification_email(user) is True
+    msg = mail.outbox[-1]
+    assert msg.to == [user.email] and "verify-email?token=" in msg.body
+    html, mime = msg.alternatives[0]
+    assert mime == "text/html" and "verify-email?token=" in html
+    assert "<b>Sita</b>" not in html and "&lt;b&gt;" in html  # names are escaped
+
+
+def test_verification_email_is_not_sent_to_verified_users(make_user):
+    from apps.accounts import tasks
+
+    tasks.send_verification_email(make_user().pk)
+    assert mail.outbox == []
+
+
+def test_resend_reports_when_the_email_cannot_be_queued(client_for, monkeypatch):
+    from apps.accounts import tasks
+
+    def broken(*args, **kwargs):
+        raise ConnectionError("broker down")
+
+    monkeypatch.setattr(tasks.send_verification_email, "delay", broken)
+    client = client_for(verified=False)
+    res = client.post("/api/v1/auth/verify-email/resend/")
+    assert res.status_code == 503 and res.json()["error"]["code"] == "email_unavailable"
+    assert client_for().post("/api/v1/auth/verify-email/resend/").status_code == 200  # already verified

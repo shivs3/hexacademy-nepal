@@ -13,6 +13,7 @@ const TONE: Record<Availability, "success" | "teal" | "neutral" | "warning"> = {
   not_open: "neutral",
   closed: "neutral",
   not_enrolled: "warning",
+  email_unverified: "warning",
   no_attempts_left: "neutral",
 };
 

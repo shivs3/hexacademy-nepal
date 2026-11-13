@@ -477,6 +477,15 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Page limit raised from 10 to 30 after making rendering faster: measured on the VPS, a dense 30-page PDF takes ~16 s (render 5 s, upload 11 s) against the 60 s request limit.
 - Deploy needs `pip install -r requirements.txt` (adds `pypdfium2`) before `migrate` (`cms.0003_notices`).
 
+## Email verification enforcement (2026-11-13)
+
+- Verified email required to buy (order and payment), enroll free and start formal exams; practice tests stay open (ADR-054). Error code `email_unverified` (403); exam lists show the reason.
+- Verification and reset emails go through the Celery worker (`apps/accounts/tasks.py`) with retries, text + branded HTML (`apps/accounts/emails.py`). Resend answers 503 `email_unavailable` if it can't be queued.
+- Frontend: `components/account/verify-email-notice.tsx` (warning with "Send a new link") is shown on the dashboard, on checkout, enroll and exam start refusals, and on formal exam pages.
+- New settings: `EMAIL_USE_SSL`, `EMAIL_TIMEOUT`, `EMAIL_VERIFICATION_REQUIRED`.
+- Verified: 457 backend tests, ruff, OpenAPI validation, frontend typecheck, lint, 137 unit tests and the production build.
+- **Blocker:** production still uses the console email backend. Needs Zoho SMTP details (docs/deployment.md, "Zoho Mail"); the server keeps `EMAIL_VERIFICATION_REQUIRED=false` until a real email is delivered.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

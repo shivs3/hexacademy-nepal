@@ -175,3 +175,20 @@ def test_database_rejects_inconsistent_totals(make_user):
         Order.objects.create(
             number="BAD-1", user=make_user(), subtotal=Decimal("100"), discount=Decimal("0"), total=Decimal("1")
         )
+
+
+def test_unverified_learner_cannot_order_or_pay(client_for, buyer, paid_course, settings):
+    course = paid_course()
+    unverified = client_for(verified=False)
+    res = order_for(unverified, course, expect=403)
+    assert res["error"]["code"] == "email_unverified"
+    assert not Order.objects.filter(user=unverified.user).exists()
+
+    # An order placed before the rule applied can't be paid either.
+    settings.EMAIL_VERIFICATION_REQUIRED = False
+    number = order_for(unverified, course)["number"]
+    settings.EMAIL_VERIFICATION_REQUIRED = True
+    res = unverified.post("/api/v1/payments/initiate/", {"order": number, "provider": "sandbox"}, format="json")
+    assert res.status_code == 403 and res.json()["error"]["code"] == "email_unverified"
+
+    order_for(buyer, course)  # verified learners are unaffected

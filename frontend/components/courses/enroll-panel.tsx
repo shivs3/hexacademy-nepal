@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { VerifyEmailNotice, isUnverifiedError } from "@/components/account/verify-email-notice";
 import { Alert } from "@/components/ui/feedback";
 import { api } from "@/lib/api/client";
 import { ApiError, errorMessage } from "@/lib/api/errors";
@@ -27,6 +28,7 @@ export function EnrollPanel({ slug, isFree, signedIn, enrolled, contactEmail }: 
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState(false);
   const learnHref = `/learn/${encodeURIComponent(slug)}`;
 
   if (enrolled) {
@@ -69,12 +71,14 @@ export function EnrollPanel({ slug, isFree, signedIn, enrolled, contactEmail }: 
   async function enroll() {
     setBusy(true);
     setError(null);
+    setUnverified(false);
     try {
       await api.post(`/courses/${encodeURIComponent(slug)}/enroll/`);
       router.push(learnHref);
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 402 ? "This course now requires payment. Refresh the page." : errorMessage(err));
+      if (isUnverifiedError(err)) setUnverified(true);
+      else setError(err instanceof ApiError && err.status === 402 ? "This course now requires payment. Refresh the page." : errorMessage(err));
       setBusy(false);
     }
   }
@@ -84,6 +88,7 @@ export function EnrollPanel({ slug, isFree, signedIn, enrolled, contactEmail }: 
       <Button size="lg" className="w-full" loading={busy} onClick={enroll}>
         Enroll for free
       </Button>
+      {unverified && <VerifyEmailNotice>You need a verified email address to enroll.</VerifyEmailNotice>}
       {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );

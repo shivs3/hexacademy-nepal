@@ -288,3 +288,22 @@ def test_concurrent_start_is_prevented_by_the_database(client_for, make_exam):
     with pytest.raises(IntegrityError), transaction.atomic():
         ExamAttempt.objects.create(exam=exam, user=client.user, number=2, started_at=timezone.now(),
                                    deadline=attempt.deadline, max_score=1)  # fmt: skip
+
+
+# --- Email verification ------------------------------------------------------------------
+
+
+def test_formal_exams_need_a_verified_email_but_practice_tests_do_not(client_for, make_exam, settings):
+    formal = make_exam(kind="formal")
+    practice = make_exam(kind="practice")
+    learner = client_for(verified=False)
+
+    res = start(learner, formal, expect=403)
+    assert res.json()["error"]["code"] == "email_unverified"
+    assert not ExamAttempt.objects.exists()
+    rows = {r["slug"]: r["availability"] for r in learner.get("/api/v1/exams/").json()["results"]}
+    assert rows[formal.slug] == "email_unverified" and rows[practice.slug] == "available"
+    start(learner, practice)
+
+    settings.EMAIL_VERIFICATION_REQUIRED = False
+    start(learner, formal)
