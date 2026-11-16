@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework.test import APIClient
 
 from apps.accounts import roles
 from apps.catalog import resources
@@ -191,24 +192,102 @@ def test_lesson_progress_of_other_course_is_not_writable(client_for, make_course
     assert res.status_code == 403
 
 
-# --- Resource downloads --------------------------------------------------------------
+# --- Lesson files: viewed in the page, never downloaded --------------------------------
 
 
-def test_resource_download_is_authorised_per_lesson(client_for, make_course, make_user):
+def _pdf_resource(lesson, make_user, make_pdf, capture):
+    upload = SimpleUploadedFile("notes.pdf", make_pdf(2), content_type="application/pdf")
+    with capture(execute=True):
+        return resources.add_file(lesson, upload, title="Notes", actor=make_user(roles.CONTENT_EDITOR))
+
+
+def test_pdf_pages_are_authorised_per_lesson(
+    client_for, make_course, make_user, make_pdf, django_capture_on_commit_callbacks
+):
     course = make_course()
     first, second = _lessons(course)
-    pdf = SimpleUploadedFile("notes.pdf", b"%PDF-1.4\n%%EOF", content_type="application/pdf")
-    resource = resources.add_file(first, pdf, title="Notes", actor=make_user(roles.CONTENT_EDITOR))
+    resource = _pdf_resource(first, make_user, make_pdf, django_capture_on_commit_callbacks)
 
     student = client_for(roles.STUDENT)
-    url = f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/download/"
+    page_url = f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/pages/1/"
+    assert student.get(page_url).status_code == 403
+    assert APIClient().get(page_url).status_code in (401, 403)
+    enroll_free(student.user, course)
+    res = student.get(page_url)
+    assert res.status_code == 200
+    assert res["Content-Type"] == "image/webp" and res["Cache-Control"] == "private, no-store"
+    assert res["Content-Disposition"].startswith("inline")
+    assert student.get(f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/pages/3/").status_code == 404
+    # Addressed through its own lesson only (no IDOR via another lesson).
+    assert student.get(f"/api/v1/lessons/{second.pk}/resources/{resource.pk}/pages/1/").status_code == 404
+    # The original PDF has no learner URL at all.
+    assert student.get(f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/download/").status_code == 404
+    assert student.get(f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/view/").status_code == 404
+
+    lesson = student.get(f"/api/v1/lessons/{first.pk}/").json()["lesson"]
+    [shown] = lesson["resources"]
+    assert shown["viewer"] == "pdf" and shown["status"] == "ready"
+    assert [p["number"] for p in shown["pages"]] == [1, 2]
+    assert "original_name" not in shown and "mime_type" not in shown
+
+
+def test_preview_lesson_pages_are_open_to_visitors(
+    make_course, make_user, make_pdf, django_capture_on_commit_callbacks
+):
+    course = make_course()
+    first, _ = _lessons(course)
+    first.is_preview = True
+    first.save(update_fields=["is_preview"])
+    resource = _pdf_resource(first, make_user, make_pdf, django_capture_on_commit_callbacks)
+    res = APIClient().get(f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/pages/2/")
+    assert res.status_code == 200
+
+
+def test_pages_are_hidden_until_ready(client_for, make_course, make_user, make_pdf):
+    course = make_course()
+    first, _ = _lessons(course)
+    upload = SimpleUploadedFile("notes.pdf", make_pdf(1), content_type="application/pdf")
+    resource = resources.add_file(first, upload, title="Notes", actor=make_user(roles.CONTENT_EDITOR))
+    student = client_for(roles.STUDENT)
+    enroll_free(student.user, course)
+    [shown] = student.get(f"/api/v1/lessons/{first.pk}/").json()["lesson"]["resources"]
+    assert shown["status"] == "pending" and shown["pages"] == []
+    assert student.get(f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/pages/1/").status_code == 404
+
+
+def test_text_files_are_shown_inline_and_sandboxed(client_for, make_course, make_user):
+    course = make_course()
+    first, _ = _lessons(course)
+    code = SimpleUploadedFile("hello.py", b"print('<b>hi</b>')\n", content_type="text/plain")
+    resource = resources.add_file(first, code, title="Code", actor=make_user(roles.CONTENT_EDITOR))
+    student = client_for(roles.STUDENT)
+    url = f"/api/v1/lessons/{first.pk}/resources/{resource.pk}/view/"
     assert student.get(url).status_code == 403
     enroll_free(student.user, course)
     res = student.get(url)
-    assert res.status_code == 200
-    assert res["Content-Disposition"].startswith("attachment") and res["Cache-Control"] == "private, no-store"
-    # The resource is addressed through its own lesson only (no IDOR via another lesson).
-    assert student.get(f"/api/v1/lessons/{second.pk}/resources/{resource.pk}/download/").status_code == 404
+    assert res.status_code == 200 and res.content == b"print('<b>hi</b>')\n"
+    assert res["Content-Type"].startswith("text/plain") and res["Content-Disposition"].startswith("inline")
+    assert "sandbox" in res["Content-Security-Policy"]
+
+
+def test_files_that_cannot_be_shown_are_not_offered(client_for, make_course):
+    from apps.catalog.models import LessonResource
+
+    course = make_course()
+    first, _ = _lessons(course)
+    # An older upload from before lessons were view-only.
+    LessonResource.objects.create(
+        lesson=first,
+        title="Old slides",
+        kind="file",
+        file="lessons/x/old.pptx",
+        original_name="old.pptx",
+        mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        size_bytes=10,
+    )
+    student = client_for(roles.STUDENT)
+    enroll_free(student.user, course)
+    assert student.get(f"/api/v1/lessons/{first.pk}/").json()["lesson"]["resources"] == []
 
 
 # --- Staff enrollment management -----------------------------------------------------

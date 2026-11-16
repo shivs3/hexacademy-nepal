@@ -9,13 +9,12 @@ from django.db.models import F, Prefetch
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog import policies, resources
-from apps.catalog.models import Course, Lesson, LessonResource
+from apps.catalog.models import Course, Lesson, LessonResource, LessonResourcePage
 from apps.catalog.services import ordered_lessons
 from common.exceptions import DomainError
 
@@ -139,7 +138,9 @@ class LessonView(APIView):
     def get(self, request, pk):
         lesson, access = _accessible_lesson(request, pk)
         lesson = (
-            Lesson.objects.select_related("course__thumbnail", "module").prefetch_related("resources").get(pk=lesson.pk)
+            Lesson.objects.select_related("course__thumbnail", "module")
+            .prefetch_related("resources__pages")
+            .get(pk=lesson.pk)
         )
         published_only = not access.staff_preview
         ids = [item.pk for item in ordered_lessons(lesson.course, published_only=published_only)]
@@ -181,13 +182,36 @@ class LessonProgressView(APIView):
         )
 
 
-class LessonResourceDownloadView(APIView):
+# Learners view lesson files in the page; there is no learner download (see catalog.resources).
+
+
+class LessonResourcePageView(APIView):
+    """One rendered page of a lesson PDF, as an image."""
+
     permission_classes = [AllowAny]  # preview lessons' files are open; lesson_access decides
+
+    @extend_schema(responses={(200, "image/webp"): bytes})
+    def get(self, request, pk, resource_id, number):
+        lesson, _ = _accessible_lesson(request, pk)
+        page = get_object_or_404(
+            LessonResourcePage.objects.select_related("resource"),
+            resource_id=resource_id,
+            resource__lesson=lesson,
+            resource__render_status=LessonResource.RenderStatus.READY,
+            number=number,
+        )
+        return resources.page_response(page)
+
+
+class LessonResourceView(APIView):
+    """An image or text lesson file, served inline for the lesson page to display."""
+
+    permission_classes = [AllowAny]
 
     @extend_schema(responses={(200, "application/octet-stream"): bytes})
     def get(self, request, pk, resource_id):
         lesson, _ = _accessible_lesson(request, pk)
-        resource = get_object_or_404(LessonResource, pk=resource_id, lesson=lesson)
-        if resource.kind != LessonResource.Kind.FILE:
-            raise ValidationError("This resource is a link, not a file.")
-        return resources.file_response(resource)
+        resource = get_object_or_404(LessonResource, pk=resource_id, lesson=lesson, kind=LessonResource.Kind.FILE)
+        if resource.viewer not in ("image", "text"):
+            raise DomainError("This file can't be opened here.", code="not_viewable", status_code=404)
+        return resources.view_response(resource)

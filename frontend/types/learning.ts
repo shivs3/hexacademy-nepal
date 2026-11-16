@@ -49,14 +49,16 @@ export type PlayerOutline = {
   modules: { id: number; title: string; lessons: PlayerLesson[] }[];
 };
 
+/** Learners view lesson files in the page; there is no download. */
 export type LessonResource = {
   id: number;
   title: string;
   kind: "file" | "link";
   url: string;
-  original_name: string;
-  mime_type: string;
-  size_bytes: number | null;
+  viewer: "pdf" | "image" | "text" | "";
+  /** PDFs are turned into page images by the server: pending → ready (or failed). */
+  status: "ready" | "pending" | "failed" | "none";
+  pages: { number: number; width: number; height: number }[];
 };
 
 export type LessonView = {

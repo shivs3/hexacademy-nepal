@@ -73,16 +73,40 @@ class PlayerOutlineSerializer(serializers.Serializer):
     modules = PlayerModuleSerializer(many=True)
 
 
+class ResourcePageSerializer(serializers.Serializer):
+    number = serializers.IntegerField()
+    width = serializers.IntegerField()
+    height = serializers.IntegerField()
+
+
 class LessonResourcePublicSerializer(serializers.ModelSerializer):
+    """What learners get: how to show the file, never a way to download it."""
+
+    viewer = serializers.ChoiceField(choices=["pdf", "image", "text", ""])
+    status = serializers.SerializerMethodField()
+    pages = serializers.SerializerMethodField()
+
     class Meta:
         model = LessonResource
-        fields = ["id", "title", "kind", "url", "original_name", "mime_type", "size_bytes"]
+        fields = ["id", "title", "kind", "url", "viewer", "status", "pages"]
+
+    def get_status(self, obj) -> str:
+        """ready, or for PDFs still being prepared: pending / failed."""
+        if obj.viewer != "pdf":
+            return "ready"
+        return obj.render_status
+
+    @extend_schema_field(ResourcePageSerializer(many=True))
+    def get_pages(self, obj):
+        if obj.viewer != "pdf" or obj.render_status != LessonResource.RenderStatus.READY:
+            return []
+        return [{"number": p.number, "width": p.width, "height": p.height} for p in obj.pages.all()]
 
 
 class LessonContentSerializer(serializers.ModelSerializer):
     """Full lesson content. Only serialised after `lesson_access` allowed it."""
 
-    resources = LessonResourcePublicSerializer(many=True)
+    resources = serializers.SerializerMethodField()
     video_embed_url = serializers.SerializerMethodField()
     module_title = serializers.CharField(source="module.title")
     course = CourseBriefSerializer()
@@ -91,6 +115,12 @@ class LessonContentSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = ["id", "title", "summary", "body", "video_embed_url", "duration_minutes", "is_preview",
                   "is_published", "module_id", "module_title", "course", "resources"]  # fmt: skip
+
+    @extend_schema_field(LessonResourcePublicSerializer(many=True))
+    def get_resources(self, obj):
+        # Files a page can't display (older slide/ZIP uploads) are not offered to learners.
+        shown = [r for r in obj.resources.all() if r.kind == LessonResource.Kind.LINK or r.viewer]
+        return LessonResourcePublicSerializer(shown, many=True).data
 
     def get_video_embed_url(self, obj) -> str:
         try:

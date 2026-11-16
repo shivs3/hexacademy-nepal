@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, Download, ExternalLink, FileUp, Link2, Pencil, Trash2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { Check, Download, ExternalLink, FileUp, Link2, Loader2, Pencil, RotateCw, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
@@ -14,10 +14,40 @@ import { formatBytes } from "@/lib/utils";
 import type { AdminResource } from "@/types/catalog-admin";
 
 const MAX_RESOURCES = 30;
+const POLL_MS = 5000;
+/** What the server accepts for lessons: things a page can show. */
+const ACCEPT = [
+  ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".txt",
+  ".md",
+  ".py",
+  ".js",
+  ".ts",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+  ".cs",
+  ".go",
+  ".php",
+  ".rb",
+  ".sql",
+  ".css",
+  ".json",
+  ".csv",
+  ".m",
+  ".r",
+].join(",");
 
 /**
- * Downloads and links attached to a lesson. Files go to private storage; the server checks
- * their type and size, and learners download them through an enrollment-checked endpoint.
+ * Files and links attached to a lesson. Files go to private storage and the server checks
+ * their type and size. Learners read files in the page and can't download them: PDFs are
+ * turned into page images (shown one at a time), images and text are shown inline.
  */
 export function ResourceManager({
   lessonId,
@@ -41,6 +71,29 @@ export function ResourceManager({
   const [removing, setRemoving] = useState<AdminResource | null>(null);
   const [busy, setBusy] = useState(false);
   const full = resources.length >= MAX_RESOURCES;
+
+  // PDFs are prepared in the background; check back until they're done.
+  const pendingIds = resources.filter((r) => r.render_status === "pending").map((r) => r.id).join(",");
+  useEffect(() => {
+    if (!pendingIds) return;
+    const timer = setTimeout(async () => {
+      const fresh = await Promise.all(
+        pendingIds.split(",").map((id) => api.get<AdminResource>(`/admin/catalog/resources/${id}/`).catch(() => null)),
+      );
+      const byId = new Map(fresh.filter((r): r is AdminResource => r !== null).map((r) => [r.id, r]));
+      if (byId.size) onChange(resources.map((r) => byId.get(r.id) ?? r));
+    }, POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pendingIds, resources, onChange]);
+
+  async function rerender(resource: AdminResource) {
+    try {
+      const saved = await api.post<AdminResource>(`/admin/catalog/resources/${resource.id}/render/`);
+      onChange(resources.map((r) => (r.id === saved.id ? saved : r)));
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -116,7 +169,7 @@ export function ResourceManager({
   return (
     <div className="flex flex-col gap-3">
       {resources.length === 0 ? (
-        <p className="text-sm text-muted">No resources. Attach slides, notes, code or links for learners.</p>
+        <p className="text-sm text-muted">No resources. Attach PDF notes or slides, images, code or links for learners.</p>
       ) : (
         <ul className="divide-y divide-line rounded-lg border border-line">
           {resources.map((r) => (
@@ -145,10 +198,17 @@ export function ResourceManager({
                     <p className="truncate text-xs text-muted">
                       {r.kind === "file" ? [r.original_name, r.size_bytes != null ? formatBytes(r.size_bytes) : null].filter(Boolean).join(" · ") : r.url}
                     </p>
+                    <RenderStatus resource={r} />
                   </div>
+                  {canEdit && r.render_status === "failed" && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void rerender(r)}>
+                      <RotateCw className="h-4 w-4" aria-hidden="true" />
+                      Try again
+                    </Button>
+                  )}
                   {r.kind === "file" ? (
                     <Button asChild variant="ghost" size="icon">
-                      <a href={`/api/v1/admin/catalog/resources/${r.id}/download/`} aria-label={`Download ${r.title}`}>
+                      <a href={`/api/v1/admin/catalog/resources/${r.id}/download/`} aria-label={`Download the original ${r.title} (staff only)`}>
                         <Download className="h-4 w-4" aria-hidden="true" />
                       </a>
                     </Button>
@@ -197,7 +257,7 @@ export function ResourceManager({
 
       {canEdit && (
         <div className="flex flex-wrap items-center gap-2">
-          <input ref={fileInput} type="file" multiple className="sr-only" id={`resource-upload-${lessonId}`} onChange={(e) => void upload(e.target.files)} disabled={full || uploading} />
+          <input ref={fileInput} type="file" multiple accept={ACCEPT} className="sr-only" id={`resource-upload-${lessonId}`} onChange={(e) => void upload(e.target.files)} disabled={full || uploading} />
           <Button type="button" variant="outline" size="sm" disabled={full} loading={uploading} onClick={() => fileInput.current?.click()}>
             <FileUp className="h-4 w-4" aria-hidden="true" />
             Upload files
@@ -209,7 +269,8 @@ export function ResourceManager({
             </Button>
           )}
           <span className="text-xs text-muted">
-            {resources.length} of {MAX_RESOURCES} · PDF, slides, documents, images, archives and code files
+            {resources.length} of {MAX_RESOURCES} · PDF, images and text/code files. Learners read them in the page and
+            can&apos;t download them; save slides and documents as PDF first.
           </span>
         </div>
       )}
@@ -225,5 +286,25 @@ export function ResourceManager({
         onConfirm={() => removing && remove(removing)}
       />
     </div>
+  );
+}
+
+function RenderStatus({ resource }: { resource: AdminResource }) {
+  if (resource.kind !== "file" || resource.render_status === "none") return null;
+  if (resource.render_status === "pending") {
+    return (
+      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted" role="status">
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+        Preparing pages for the viewer…
+      </p>
+    );
+  }
+  if (resource.render_status === "failed") {
+    return <p className="mt-0.5 text-xs text-danger">{resource.render_error || "The pages could not be prepared."}</p>;
+  }
+  return (
+    <p className="mt-0.5 text-xs text-success">
+      Ready · {resource.page_count} {resource.page_count === 1 ? "page" : "pages"}
+    </p>
   );
 }

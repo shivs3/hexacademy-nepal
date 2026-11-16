@@ -267,14 +267,16 @@ class AdminLessonViewSet(
         return Response(ResourceSerializer(resource).data, status=status.HTTP_201_CREATED)
 
 
-class AdminResourceViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+class AdminResourceViewSet(
+    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet
+):
     permission_classes = [StaffPanel]
     serializer_class = ResourceSerializer
     queryset = LessonResource.objects.select_related("lesson")
 
     def get_object(self):
         resource = super().get_object()
-        course_for(self.request, resource.lesson.course_id, edit=self.action != "download")
+        course_for(self.request, resource.lesson.course_id, edit=self.action not in ("download", "retrieve"))
         return resource
 
     def perform_destroy(self, instance):
@@ -287,3 +289,10 @@ class AdminResourceViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vi
         if resource.kind != LessonResource.Kind.FILE:
             raise ValidationError("This resource is a link, not a file.")
         return resources.file_response(resource)
+
+    @extend_schema(request=None, responses=ResourceSerializer)
+    @action(detail=True, methods=["post"], url_path="render")
+    def render_pages(self, request, pk=None):
+        """Prepare a PDF's pages again, e.g. after a failure."""
+        resource = resources.request_render(self.get_object(), actor=request.user, request=request)
+        return Response(ResourceSerializer(resource).data)

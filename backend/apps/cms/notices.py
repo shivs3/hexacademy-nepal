@@ -6,76 +6,28 @@ those images inline, so visitors read the notice inside the website rather
 than in the browser's own PDF viewer, and the popup can preview page one.
 """
 
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from io import BytesIO
 
-import pypdfium2 as pdfium
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
 
 from apps.audit import services as audit
+from common.pdf_pages import WORKERS, PdfError, render_pages
 
 from .models import MediaAsset, Notice, NoticePage
 
+# Rendering happens inside the save request (60 s limit in Gunicorn and Nginx);
+# a dense 30-page PDF takes about 16 s on the VPS.
 MAX_PDF_PAGES = 30
-RENDER_WIDTH = 1600  # pixels; sharp on retina phones, readable full-width on desktop
-MAX_RENDER_HEIGHT = 8000
-MAX_SCALE = 4.0
-# Rendering happens inside the save request (60 s limit in Gunicorn and Nginx).
-# WebP encoding and uploads run on a few threads; Pillow and boto3 release the
-# GIL for that work. pdfium itself is not thread-safe, so pages render in turn.
-WORKERS = 4
-WEBP_METHOD = 4  # 6 is ~2-3x slower for a few percent smaller files
-
-
-def _encode(image) -> tuple[bytes, int, int]:
-    buf = BytesIO()
-    image.save(buf, format="WEBP", quality=88, method=WEBP_METHOD)
-    return buf.getvalue(), image.width, image.height
 
 
 def render_pdf(data: bytes) -> list[tuple[bytes, int, int]]:
     """Render each page to WebP; returns (bytes, width, height) per page."""
     try:
-        pdf = pdfium.PdfDocument(data)
-    except pdfium.PdfiumError:
-        raise ValidationError(
-            {"attachment": ["The PDF could not be opened. It may be damaged or password-protected."]}
-        ) from None
-    try:
-        count = len(pdf)
-        if count == 0:
-            raise ValidationError({"attachment": ["The PDF has no pages."]})
-        if count > MAX_PDF_PAGES:
-            raise ValidationError(
-                {"attachment": [f"Notices can show at most {MAX_PDF_PAGES} PDF pages; this one has {count}."]}
-            )
-        pages = []
-        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            pending = deque()  # at most WORKERS rendered bitmaps held in memory
-            for index in range(count):
-                page = pdf[index]
-                try:
-                    width, height = page.get_size()
-                    if width <= 0 or height <= 0:
-                        raise ValidationError({"attachment": [f"Page {index + 1} of the PDF has no size."]})
-                    scale = min(RENDER_WIDTH / width, MAX_RENDER_HEIGHT / height, MAX_SCALE)
-                    image = page.render(scale=scale).to_pil().convert("RGB")
-                except pdfium.PdfiumError:
-                    raise ValidationError(
-                        {"attachment": [f"Page {index + 1} of the PDF could not be rendered."]}
-                    ) from None
-                finally:
-                    page.close()
-                pending.append(pool.submit(_encode, image))
-                if len(pending) >= WORKERS:
-                    pages.append(pending.popleft().result())
-            pages.extend(f.result() for f in pending)
-        return pages
-    finally:
-        pdf.close()
+        return list(render_pages(data, max_pages=MAX_PDF_PAGES))
+    except PdfError as exc:
+        raise ValidationError({"attachment": [str(exc)]}) from None
 
 
 def _upload_pages(notice: Notice, rendered: list[tuple[bytes, int, int]]) -> list[NoticePage]:

@@ -105,7 +105,8 @@ Public catalog endpoints only ever return published courses (archived courses st
 | GET | `/me/courses/{slug}/` | authenticated | Player outline: modules, lessons, completed and locked flags |
 | GET | `/lessons/{id}/` | see access rules | 403 `not_enrolled` / `locked`, 404 `unavailable` |
 | POST | `/lessons/{id}/progress/` | active enrollment | `{completed?: bool}`; empty body records a visit. Returns `{completed, course_completed, progress}` |
-| GET | `/lessons/{id}/resources/{rid}/download/` | lesson access | Attachment download, or a redirect to a signed URL with object storage |
+| GET | `/lessons/{id}/resources/{rid}/pages/{n}/` | lesson access | One page of a lesson PDF as a WebP image, served inline (`private, no-store`; a signed-URL redirect with object storage). 404 until the pages are ready |
+| GET | `/lessons/{id}/resources/{rid}/view/` | lesson access | An image or text lesson file, inline. Text is `text/plain` (first 1 MB, `X-Truncated: 1` if cut) with a sandbox CSP. There is no learner download; the original PDF is never sent |
 
 Lesson access: a published free-preview lesson of a published course; or an active enrollment and a published lesson (for sequential courses, all earlier lessons complete); or staff who can open the course.
 
@@ -124,7 +125,7 @@ Lesson access: a published free-preview lesson of a published course; or an acti
 | POST | `…/{id}/modules/` · PATCH/DELETE `/admin/catalog/modules/{id}/` | edit access. A module with lessons can't be deleted |
 | POST | `/admin/catalog/lessons/` · GET/PATCH/DELETE `/admin/catalog/lessons/{id}/` | edit access. `module` is fixed after creation; a lesson with learner progress can't be deleted |
 | POST | `/admin/catalog/lessons/{id}/resources/` | edit access. Multipart `file` + `title`, or JSON `{title, url}` |
-| PATCH/DELETE | `/admin/catalog/resources/{id}/` · GET `…/{id}/download/` | edit access |
+| GET/PATCH/DELETE | `/admin/catalog/resources/{id}/` · GET `…/{id}/download/` · POST `…/{id}/render/` (prepare PDF pages again) | view (GET, download) or edit access |
 | GET/POST | `/admin/learning/enrollments/` | List: manage_enrollments, view_learner_progress or manage_catalog see all; instructors and TAs only their courses. `?course= ?status= ?search=`. POST `{course, email}` (manage_enrollments): 201 new, 200 existing |
 | GET | `/admin/learning/enrollments/{id}/` | as list; includes per-lesson progress |
 | POST | `…/{id}/revoke/`, `…/{id}/reinstate/` | manage_enrollments. Audited |

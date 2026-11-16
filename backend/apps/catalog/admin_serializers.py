@@ -245,7 +245,20 @@ class TeamCandidateSerializer(serializers.ModelSerializer):
 class ResourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = LessonResource
-        fields = ["id", "title", "kind", "original_name", "mime_type", "size_bytes", "url", "position", "created_at"]
+        fields = [
+            "id",
+            "title",
+            "kind",
+            "original_name",
+            "mime_type",
+            "size_bytes",
+            "url",
+            "position",
+            "created_at",
+            "render_status",
+            "render_error",
+            "page_count",
+        ]
         read_only_fields = [f for f in fields if f != "title"]
 
     def validate_title(self, value):

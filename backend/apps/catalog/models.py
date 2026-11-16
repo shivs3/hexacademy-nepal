@@ -196,16 +196,27 @@ class LessonResource(TimeStampedModel):
         FILE = "file", "File"
         LINK = "link", "Link"
 
+    class RenderStatus(models.TextChoices):
+        NONE = "none", "Not a PDF"
+        PENDING = "pending", "Preparing pages"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="resources")
     title = models.CharField(max_length=160)
     kind = models.CharField(max_length=10, choices=Kind.choices)
-    # Private storage: files are only reachable through the authorised download endpoint.
+    # Private storage: only staff can download the original; learners view it in the page.
     file = models.FileField(upload_to=resource_upload_to, storage=private_storage, max_length=255, blank=True)
     original_name = models.CharField(max_length=255, blank=True)
     mime_type = models.CharField(max_length=100, blank=True)
     size_bytes = models.PositiveBigIntegerField(default=0)
     url = models.URLField(max_length=500, blank=True)
     position = models.PositiveIntegerField(default=0)
+    # PDFs are shown to learners as page images rendered by the worker; the
+    # original file is never sent to them.
+    render_status = models.CharField(max_length=10, choices=RenderStatus.choices, default=RenderStatus.NONE)
+    render_error = models.CharField(max_length=300, blank=True)
+    page_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["position", "id"]
@@ -218,3 +229,43 @@ class LessonResource(TimeStampedModel):
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_pdf(self) -> bool:
+        return self.kind == self.Kind.FILE and self.mime_type == "application/pdf"
+
+    @property
+    def viewer(self) -> str:
+        """How learners see this file in the page: pdf, image, text, or "" (not viewable)."""
+        if self.kind != self.Kind.FILE:
+            return ""
+        if self.is_pdf:
+            return "pdf"
+        if self.mime_type.startswith("image/"):
+            return "image"
+        if self.mime_type == "text/plain":
+            return "text"
+        return ""
+
+
+def resource_page_upload_to(instance: "LessonResourcePage", filename: str) -> str:
+    return f"lesson-pages/{instance.resource_id}/{uuid.uuid4().hex}.webp"
+
+
+class LessonResourcePage(models.Model):
+    """One rendered page of a lesson PDF (private storage, served page by page)."""
+
+    resource = models.ForeignKey(LessonResource, on_delete=models.CASCADE, related_name="pages")
+    number = models.PositiveIntegerField()
+    image = models.FileField(upload_to=resource_page_upload_to, storage=private_storage, max_length=255)
+    width = models.PositiveIntegerField()
+    height = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["number"]
+        constraints = [
+            models.UniqueConstraint(fields=["resource", "number"], name="catalog_resourcepage_unique_number")
+        ]
+
+    def __str__(self):
+        return f"{self.resource_id} p{self.number}"

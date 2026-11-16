@@ -73,11 +73,14 @@ Course ──► Category                      SET_NULL
 Course ──► MediaAsset                    thumbnail, og_image   SET_NULL
 Course ──< CourseInstructor >── User     (CASCADE; role instructor / teaching_assistant)
 Course ──< CourseModule ──< Lesson ──< LessonResource   (CASCADE)
+LessonResource ──< LessonResourcePage    (CASCADE; unique (resource, number); WebP in private storage)
 Lesson ──► Course                        denormalised for access checks, kept equal to module.course
 Enrollment ──► User (CASCADE), Course (PROTECT)
 Enrollment ──< LessonProgress ──► Lesson (CASCADE)
 Enrollment ──► Lesson                    last_lesson   SET_NULL
 ```
+
+`LessonResource` has `render_status` (none / pending / ready / failed), `render_error` and `page_count`. PDFs start as pending and the Celery task `render_resource_pages` fills `LessonResourcePage` rows (number, image, width, height). Migration `catalog.0002` marks existing PDFs pending; `manage.py render_lesson_pdfs` renders them without the worker.
 
 | Table | Key columns and rules |
 | --- | --- |

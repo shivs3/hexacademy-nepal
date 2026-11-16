@@ -486,6 +486,13 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Verified: 457 backend tests, ruff, OpenAPI validation, frontend typecheck, lint, 137 unit tests and the production build.
 - **Blocker:** production still uses the console email backend. Needs Zoho SMTP details (docs/deployment.md, "Zoho Mail"); the server keeps `EMAIL_VERIFICATION_REQUIRED=false` until a real email is delivered.
 
+## View-only lesson files with a page-by-page PDF viewer (2026-11-16)
+
+- Lesson PDFs are rendered by the worker to WebP pages (`apps/catalog/tasks.py`, `resources.render_resource`); learners see one page at a time with Previous/Next and arrow keys (`components/learning/lesson-files.tsx`). Images and text/code show inline. The learner download endpoint is gone (ADR-055).
+- New: `LessonResourcePage`, `LessonResource.render_status/render_error/page_count` (migration `catalog.0002`, which marks existing PDFs pending), learner endpoints `…/pages/{n}/` and `…/view/`, admin `GET resources/{id}/` and `POST resources/{id}/render/`, command `render_lesson_pdfs`.
+- Lessons now accept only PDF, images and text; the admin shows "Preparing pages…", the page count, or the error with "Try again".
+- Verified locally: 466 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 141 unit tests and the production build.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

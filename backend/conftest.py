@@ -121,3 +121,22 @@ def assert_constant_queries():
         assert second == first, f"{url}: {first} queries for {small} rows, {second} for {large}"
 
     return _assert
+
+
+@pytest.fixture
+def make_pdf():
+    """A real PDF of `pages` pages, as bytes."""
+    from io import BytesIO
+
+    from reportlab.pdfgen import canvas
+
+    def _make(pages=1):
+        buf = BytesIO()
+        c = canvas.Canvas(buf)
+        for n in range(pages):
+            c.drawString(100, 750, f"Lesson notes page {n + 1}")
+            c.showPage()
+        c.save()
+        return buf.getvalue()
+
+    return _make

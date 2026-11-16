@@ -86,6 +86,10 @@ export type AdminResource = {
   url: string;
   position: number;
   created_at: string;
+  /** PDFs are prepared as page images for the in-page viewer. */
+  render_status: "none" | "pending" | "ready" | "failed";
+  render_error: string;
+  page_count: number;
 };
 
 export type AdminLesson = {

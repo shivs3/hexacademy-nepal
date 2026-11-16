@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Lock } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Lock } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -6,6 +6,7 @@ import { cache } from "react";
 
 import { RichText } from "@/components/cms/rich-text";
 import { CourseOutline } from "@/components/learning/course-outline";
+import { LessonFiles } from "@/components/learning/lesson-files";
 import { LessonProgress } from "@/components/learning/lesson-progress";
 import { Button } from "@/components/ui/button";
 import { Alert, EmptyState } from "@/components/ui/feedback";
@@ -13,7 +14,6 @@ import { isApiError } from "@/lib/api/errors";
 import { serverGet, serverGetOrNull } from "@/lib/api/server";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMinutes, lessonPath } from "@/lib/catalog";
-import { formatBytes } from "@/lib/utils";
 import type { LessonView, PlayerOutline } from "@/types/learning";
 
 type Props = { params: Promise<{ slug: string; lessonId: string }> };
@@ -86,7 +86,8 @@ export default async function LessonPage({ params }: Props) {
   const tracksProgress = view.enrolled && !view.staff_preview && lesson.is_published;
   const prevHref = view.previous_lesson_id ? lessonPath(slug, view.previous_lesson_id) : null;
   const nextHref = view.next_lesson_id ? lessonPath(slug, view.next_lesson_id) : null;
-  const downloadBase = `/api/v1/lessons/${lesson.id}/resources`;
+  const files = lesson.resources.filter((r) => r.kind === "file");
+  const links = lesson.resources.filter((r) => r.kind === "link");
 
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
@@ -142,31 +143,30 @@ export default async function LessonPage({ params }: Props) {
 
         {lesson.body && <RichText html={lesson.body} className="mt-8" />}
 
-        {lesson.resources.length > 0 && (
+        {files.length > 0 && (
+          <section aria-labelledby="lesson-files" className="mt-10">
+            <h2 id="lesson-files" className="text-lg font-semibold">
+              Lesson {files.length === 1 ? "file" : "files"}
+            </h2>
+            <LessonFiles lessonId={lesson.id} files={files} />
+          </section>
+        )}
+
+        {links.length > 0 && (
           <section aria-labelledby="resources" className="mt-10 rounded-[var(--radius-card)] border border-line bg-white p-5">
             <h2 id="resources" className="text-lg font-semibold">
-              Resources
+              Further reading
             </h2>
             <ul className="mt-3 divide-y divide-line">
-              {lesson.resources.map((resource) =>
-                resource.kind === "file" ? (
-                  <li key={resource.id} className="flex items-center gap-3 py-2.5 text-sm">
-                    <Download className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-                    <a href={`${downloadBase}/${resource.id}/download/`} className="flex-1 font-medium text-teal-700 hover:underline" download>
-                      {resource.title}
-                    </a>
-                    {resource.size_bytes !== null && <span className="text-muted">{formatBytes(resource.size_bytes)}</span>}
-                  </li>
-                ) : (
-                  <li key={resource.id} className="flex items-center gap-3 py-2.5 text-sm">
-                    <ExternalLink className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-                    <a href={resource.url} target="_blank" rel="noopener noreferrer nofollow" className="flex-1 font-medium text-teal-700 hover:underline">
-                      {resource.title}
-                      <span className="sr-only"> (opens in a new tab)</span>
-                    </a>
-                  </li>
-                ),
-              )}
+              {links.map((resource) => (
+                <li key={resource.id} className="flex items-center gap-3 py-2.5 text-sm">
+                  <ExternalLink className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                  <a href={resource.url} target="_blank" rel="noopener noreferrer nofollow" className="flex-1 font-medium text-teal-700 hover:underline">
+                    {resource.title}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </li>
+              ))}
             </ul>
           </section>
         )}

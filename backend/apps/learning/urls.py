@@ -19,9 +19,14 @@ urlpatterns = [
     path("lessons/<int:pk>/", views.LessonView.as_view(), name="lesson"),
     path("lessons/<int:pk>/progress/", views.LessonProgressView.as_view(), name="lesson-progress"),
     path(
-        "lessons/<int:pk>/resources/<int:resource_id>/download/",
-        views.LessonResourceDownloadView.as_view(),
-        name="lesson-resource-download",
+        "lessons/<int:pk>/resources/<int:resource_id>/pages/<int:number>/",
+        views.LessonResourcePageView.as_view(),
+        name="lesson-resource-page",
+    ),
+    path(
+        "lessons/<int:pk>/resources/<int:resource_id>/view/",
+        views.LessonResourceView.as_view(),
+        name="lesson-resource-view",
     ),
     path(
         "admin/learning/courses/",
