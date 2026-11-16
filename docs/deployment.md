@@ -170,7 +170,7 @@ Certificate PDFs use reportlab's built-in fonts, which cover Latin text only. Na
 
 The frontend sends a nonce-based CSP on every page (`docs/security.md`). Set these in `.env` for the frontend container:
 
-- `CSP_MEDIA_ORIGINS`: the public media origin (the R2 custom domain, `S3_PUBLIC_CUSTOM_DOMAIN` with `https://`).
+- `CSP_MEDIA_ORIGINS`: space-separated. The public media origin (the R2 custom domain, `S3_PUBLIC_CUSTOM_DOMAIN` with `https://`) **and** the private bucket's endpoint origin (`S3_ENDPOINT_URL` without the path, e.g. `https://<account-id>.r2.cloudflarestorage.com`). Lesson PDF pages and lesson images redirect to signed URLs on that endpoint; without it the browser blocks them and the viewer says "This page could not be loaded". On the VPS this lives in `frontend/.env.production`.
 - `CSP_FORM_ACTION_ORIGINS`: the origin of `ESEWA_FORM_URL`. The default is eSewa's UAT host; when you switch to eSewa's production URL, put its origin here too, or the browser blocks the checkout form.
 - `CSP_REPORT_URI` (optional): a report collector. Leave it empty if you don't run one.
 

@@ -492,6 +492,7 @@ Update this file at the end of every milestone. Only record what was actually ex
 - New: `LessonResourcePage`, `LessonResource.render_status/render_error/page_count` (migration `catalog.0002`, which marks existing PDFs pending), learner endpoints `…/pages/{n}/` and `…/view/`, admin `GET resources/{id}/` and `POST resources/{id}/render/`, command `render_lesson_pdfs`.
 - Lessons now accept only PDF, images and text; the admin shows "Preparing pages…", the page count, or the error with "Try again".
 - Verified locally: 466 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 141 unit tests and the production build.
+- Production fix: page images were blocked by the CSP (they redirect to the private R2 endpoint). The server's `frontend/.env.production` now sets `CSP_MEDIA_ORIGINS` to include that endpoint; checked in headless Chromium on the live preview lesson (pages load, no CSP errors).
 
 ## How to continue
 
