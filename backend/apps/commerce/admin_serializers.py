@@ -233,6 +233,8 @@ class AdminPaymentSettingsSerializer(serializers.ModelSerializer):
             "bank_transfer_enabled",
             "bank_transfer_instructions",
             "order_ttl_minutes",
+            "request_notify_email",
+            "request_instructions",
             "updated_at",
             "gateways",
         ]
@@ -244,6 +246,11 @@ class AdminPaymentSettingsSerializer(serializers.ModelSerializer):
         return [{"key": key, "label": g.label, "configured": g.is_configured()} for key, g in GATEWAYS.items()]
 
     def validate_bank_transfer_instructions(self, value):
+        return sanitize.clean_rich_text(value)
+
+    def validate_request_instructions(self, value):
+        if len(value) > 20_000:
+            raise serializers.ValidationError("Keep the instructions shorter.")
         return sanitize.clean_rich_text(value)
 
     def validate_order_ttl_minutes(self, value):

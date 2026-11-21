@@ -190,6 +190,9 @@ class Exam(TimeStampedModel):
     show_answers = models.BooleanField(default=True, help_text="Show correct answers in the review once released.")
     show_explanations = models.BooleanField(default=True)
     ranking_enabled = models.BooleanField(default=False)
+    # Only standalone exams (no course) can carry a price; a course exam is
+    # included with the course. A paid exam needs an ExamAccess grant.
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
 
     published_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
@@ -212,10 +215,47 @@ class Exam(TimeStampedModel):
                 condition=Q(max_attempts__isnull=True) | Q(max_attempts__gt=0),
                 name="assessments_exam_max_attempts_positive",
             ),
+            models.CheckConstraint(condition=Q(price__gte=0), name="assessments_exam_price_non_negative"),
+            models.CheckConstraint(
+                condition=Q(price=0) | Q(course__isnull=True), name="assessments_exam_paid_only_standalone"
+            ),
         ]
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_free(self):
+        return self.price <= 0
+
+
+class ExamAccess(TimeStampedModel):
+    """Staff-granted right to take a paid standalone exam."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+
+    class Source(models.TextChoices):
+        REQUEST = "request", "Approved request"
+        STAFF = "staff", "Added by staff"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="exam_accesses")
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="accesses")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE, db_index=True)
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.STAFF)
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    granted_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-granted_at"]
+        constraints = [models.UniqueConstraint(fields=["user", "exam"], name="assessments_examaccess_unique")]
+
+    def __str__(self):
+        return f"{self.user_id} → {self.exam_id} ({self.status})"
 
 
 class ExamQuestion(models.Model):

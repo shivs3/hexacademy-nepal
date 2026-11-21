@@ -156,6 +156,13 @@ All money is `Decimal(12, 2)` in NPR; no floats anywhere, including the frontend
 
 Custom permissions: `commerce.view_orders`, `manage_orders`, `manage_refunds`, `manage_coupons`, `view_revenue`, `manage_payment_settings`.
 
+## Access requests and paid exams (2026-11-21)
+
+- `assessments_exam.price` `Decimal(10, 2)`, default 0 (free). `CHECK` price ≥ 0, and `CHECK` price = 0 or `course` is null: only standalone exams can be paid; course exams follow the course enrollment.
+- `assessments_examaccess`: `user` (CASCADE), `exam` (CASCADE), `status` active/revoked (indexed), `source` request/staff, `granted_by` (SET_NULL), `granted_at`, `revoked_at`. Unique `(user, exam)`; revoking keeps the row so it can be restored.
+- `commerce_accessrequest`: `number` unique, `user` (CASCADE), `kind` course/exam, `course` / `exam` (SET_NULL), snapshots `item_title` and `price` (`CHECK` ≥ 0), `full_name`, `phone`, `payment_reference`, `message` (plain text), `status` pending/approved/rejected/cancelled (indexed), `staff_note`, `handled_by` (SET_NULL), `handled_at`. **Partial unique `(user, course)` and `(user, exam)` where pending**, so a learner has at most one open request per item.
+- `commerce_paymentsettings` gains `request_notify_email` (default hexacademynepal@gmail.com) and `request_instructions` (sanitised rich text: how to pay).
+
 ## Live classes, assignments, notifications and certificates (M6)
 
 ```

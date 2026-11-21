@@ -1,14 +1,35 @@
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from . import admin_views, views
+from . import access_views, admin_views, views
 
 router = SimpleRouter()
 router.register("admin/commerce/orders", admin_views.AdminOrderViewSet, basename="admin-commerce-orders")
 router.register("admin/commerce/payments", admin_views.AdminPaymentViewSet, basename="admin-commerce-payments")
 router.register("admin/commerce/coupons", admin_views.AdminCouponViewSet, basename="admin-commerce-coupons")
+router.register("admin/commerce/requests", access_views.AdminAccessRequestViewSet, basename="admin-commerce-requests")
 
 urlpatterns = [
+    path("checkout/item/", access_views.CheckoutItemView.as_view(), name="checkout-item"),
+    path("access-requests/", access_views.AccessRequestCreateView.as_view(), name="access-request-create"),
+    path("me/access-requests/", access_views.MyAccessRequestsView.as_view(), name="my-access-requests"),
+    path(
+        "me/access-requests/<str:number>/cancel/",
+        access_views.MyAccessRequestCancelView.as_view(),
+        name="my-access-request-cancel",
+    ),
+    path("admin/users/<int:pk>/access/", access_views.AdminUserAccessView.as_view(), name="admin-user-access"),
+    path(
+        "admin/users/<int:pk>/exam-access/",
+        access_views.AdminUserExamAccessView.as_view(),
+        name="admin-user-exam-access",
+    ),
+    path(
+        "admin/exam-access/<int:pk>/revoke/",
+        access_views.AdminExamAccessRevokeView.as_view(),
+        name="admin-exam-access-revoke",
+    ),
+    path("admin/access/options/", access_views.AdminAccessOptionsView.as_view(), name="admin-access-options"),
     path("payments/methods/", views.PaymentMethodsView.as_view(), name="payment-methods"),
     path("orders/quote/", views.QuoteView.as_view(), name="order-quote"),
     path("orders/", views.OrderCreateView.as_view(), name="order-create"),

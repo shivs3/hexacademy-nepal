@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Gauge,
   Image as ImageIcon,
+  Inbox,
   LayoutDashboard,
   Mail,
   Megaphone,
@@ -54,6 +55,7 @@ const icons = {
   media: ImageIcon,
   settings: Settings,
   audit: ScrollText,
+  requests: Inbox,
   analytics: Gauge,
   security: ShieldCheck,
 } as const;

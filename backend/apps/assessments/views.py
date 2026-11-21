@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 from apps.learning.models import Enrollment
 
 from . import attempts, results, services
-from .models import AttemptQuestion, Exam, ExamAttempt
+from .models import AttemptQuestion, Exam, ExamAccess, ExamAttempt
 from .serializers import (
     AdvanceInputSerializer,
     AnswerInputSerializer,
@@ -71,6 +71,8 @@ class ExamListView(generics.ListAPIView):
         if self.request.user.is_authenticated:
             enrolled = Enrollment.objects.filter(user=self.request.user, status=Enrollment.Status.ACTIVE)
             context["enrolled_course_ids"] = set(enrolled.values_list("course_id", flat=True))
+            access = ExamAccess.objects.filter(user=self.request.user, status=ExamAccess.Status.ACTIVE)
+            context["accessible_exam_ids"] = set(access.values_list("exam_id", flat=True))
         return context
 
 

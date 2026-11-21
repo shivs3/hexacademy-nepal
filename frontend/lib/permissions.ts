@@ -63,3 +63,8 @@ export function canOpenAssignments(user: Pick<CurrentUser, "permissions" | "is_s
 export function canOpenCertificates(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
   return hasAnyPerm(user, ["certificates.manage_certificates", "certificates.view_certificates"]);
 }
+
+/** Approve or reject checkout requests for paid courses and exams. */
+export function canHandleAccessRequests(user: Pick<CurrentUser, "permissions" | "is_superuser"> | null): boolean {
+  return hasAnyPerm(user, ["learning.manage_enrollments", "commerce.manage_orders"]);
+}

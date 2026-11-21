@@ -63,13 +63,25 @@ class LearnerExamSerializer(serializers.ModelSerializer):
     availability = serializers.SerializerMethodField()
     attempts_used = serializers.SerializerMethodField()
     open_attempt_id = serializers.SerializerMethodField()
+    is_free = serializers.BooleanField(read_only=True)
+    has_access = serializers.SerializerMethodField()
 
     class Meta:
         model = Exam
         fields = [
             "id", "slug", "title", "kind", "course", "duration_minutes", "opens_at", "closes_at", "max_attempts",
             "total_marks", "question_total", "availability", "attempts_used", "open_attempt_id",
+            "price", "is_free", "has_access",
         ]  # fmt: skip
+
+    def get_has_access(self, obj) -> bool:
+        """Whether the learner may take this exam as far as payment goes."""
+        if obj.course_id or obj.is_free:
+            return True
+        ids = self.context.get("accessible_exam_ids")
+        if ids is not None:
+            return obj.pk in ids
+        return attempts.has_exam_access(self.context["request"].user, obj)
 
     def _mine(self, obj):
         if hasattr(obj, "my_attempts"):  # prefetched by the list view
@@ -94,6 +106,7 @@ class LearnerExamSerializer(serializers.ModelSerializer):
                 "not_open",
                 "closed",
                 "not_enrolled",
+                "not_purchased",
                 "email_unverified",
                 "no_attempts_left",
             ]  # fmt: skip
@@ -108,6 +121,7 @@ class LearnerExamSerializer(serializers.ModelSerializer):
             obj,
             enrolled=None if enrolled_ids is None else obj.course_id in enrolled_ids,
             used=len(obj.my_attempts) if hasattr(obj, "my_attempts") else None,
+            has_access=self.get_has_access(obj),
         )
         return "available" if allowed else reason
 

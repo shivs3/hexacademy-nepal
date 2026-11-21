@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/feedback";
 import { AVAILABILITY_TEXT, EXAM_KIND_LABEL, attemptsLeftText, formatMarks } from "@/lib/assessments";
+import { formatPrice } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/utils";
 import type { Availability, LearnerExam } from "@/types/assessments";
 
@@ -13,6 +14,7 @@ const TONE: Record<Availability, "success" | "teal" | "neutral" | "warning"> = {
   not_open: "neutral",
   closed: "neutral",
   not_enrolled: "warning",
+  not_purchased: "warning",
   email_unverified: "warning",
   no_attempts_left: "neutral",
 };
@@ -24,6 +26,7 @@ export function ExamCard({ exam }: { exam: LearnerExam }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={exam.kind === "formal" ? "navy" : "mint"}>{EXAM_KIND_LABEL[exam.kind]}</Badge>
           <Badge tone={TONE[exam.availability]}>{AVAILABILITY_TEXT[exam.availability]}</Badge>
+          <Badge tone={exam.is_free ? "success" : "teal"}>{exam.is_free ? "Free" : formatPrice(exam.price)}</Badge>
         </div>
         <div>
           <h3 className="text-base font-semibold text-navy">

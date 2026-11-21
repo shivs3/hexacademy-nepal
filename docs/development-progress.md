@@ -494,6 +494,16 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Verified locally: 466 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 141 unit tests and the production build.
 - Production fix: page images were blocked by the CSP (they redirect to the private R2 endpoint). The server's `frontend/.env.production` now sets `CSP_MEDIA_ORIGINS` to include that endpoint; checked in headless Chromium on the live preview lesson (pages load, no CSP errors).
 
+## Admin-controlled access and request-form checkout (2026-11-21)
+
+- Paid or free courses (existing price) and exams (new `Exam.price`, standalone exams only). Free items work as before; paid ones show "Request access".
+- Checkout (`/checkout?course=` or `?exam=`) is a request form; requests are stored, emailed to the notify address from the worker, and listed in Admin → Access requests for approve/reject (ADR-056). Learners see their requests at Dashboard → Access requests and can cancel pending ones.
+- Admin → Users → Access (`/admin/users/{id}`): add or remove courses, paid exams and batches for any user, and handle their requests.
+- Payment settings: notify email and "how to pay" instructions. Exam settings: price field.
+- New: `apps/assessments/access.py`, `apps/commerce/access_requests.py`, `access_views.py`, `access_serializers.py`; migrations `assessments.0002`, `commerce.0002`; tests `test_exam_access.py`, `test_access_requests.py`.
+- Verified locally: 494 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 145 unit tests and the production build.
+- **Blocker unchanged:** email to the notify address needs SMTP (Zoho details awaited). Until then requests only appear in the admin.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

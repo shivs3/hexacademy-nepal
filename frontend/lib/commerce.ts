@@ -1,5 +1,6 @@
 import type { BadgeTone } from "@/components/ui/feedback";
 import { decimalToMinor } from "@/lib/catalog";
+import type { AccessRequestStatus } from "@/types/access";
 import type { MyOrder, OrderStatus, PaymentAction, PaymentStatus } from "@/types/commerce";
 
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: BadgeTone }> = {
@@ -71,3 +72,14 @@ export function goToProvider(action: PaymentAction, doc: Document = document): v
 export function checkoutHref(courseSlug: string): string {
   return `/checkout?course=${encodeURIComponent(courseSlug)}`;
 }
+
+export function examCheckoutHref(examSlug: string): string {
+  return `/checkout?exam=${encodeURIComponent(examSlug)}`;
+}
+
+export const ACCESS_REQUEST_STATUS: Record<AccessRequestStatus, { label: string; tone: BadgeTone }> = {
+  pending: { label: "Waiting for review", tone: "warning" },
+  approved: { label: "Approved", tone: "success" },
+  rejected: { label: "Not approved", tone: "danger" },
+  cancelled: { label: "Cancelled", tone: "neutral" },
+};

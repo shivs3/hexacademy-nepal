@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell, type NavItem, type NavSection } from "@/components/shell/app-shell";
 import { requireStaff } from "@/lib/auth";
-import { canOpenAssignments, canOpenBank, canOpenCertificates, canOpenCatalog, canOpenEnrollments, canOpenExams, canOpenLiveClasses, canOpenOrders, hasAnyPerm, hasPerm } from "@/lib/permissions";
+import { canOpenAssignments, canOpenBank, canOpenCertificates, canOpenCatalog, canOpenEnrollments, canOpenExams, canOpenLiveClasses, canOpenOrders, canHandleAccessRequests, hasAnyPerm, hasPerm } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: { default: "Staff", template: "%s | Staff | Hexacademy Nepal" }, robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -30,6 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     assessments.push({ href: "/admin/assessments/subjects", label: "Subjects & topics", icon: "categories" });
 
   const commerce: NavItem[] = [];
+  if (canHandleAccessRequests(user)) commerce.push({ href: "/admin/commerce/requests", label: "Access requests", icon: "requests" });
   if (canOpenOrders(user)) commerce.push({ href: "/admin/commerce/orders", label: "Orders", icon: "orders" });
   if (hasPerm(user, "commerce.manage_coupons")) commerce.push({ href: "/admin/commerce/coupons", label: "Coupons", icon: "coupons" });
   if (hasPerm(user, "commerce.view_revenue")) commerce.push({ href: "/admin/commerce/revenue", label: "Revenue", icon: "analytics" });

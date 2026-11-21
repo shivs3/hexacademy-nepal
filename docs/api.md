@@ -205,6 +205,33 @@ Prices, discounts and totals are always computed by the server; the browser send
 | GET/PATCH | `/admin/commerce/settings/` | manage_payment_settings. Gateways can only be enabled when configured; responses show `configured` flags, never keys |
 | GET | `/admin/commerce/reports/revenue/?start=&end=&group=day\|month` | view_revenue. Gross, refunds, net, per period, per provider and per course (Nepal calendar days) |
 
+## Access requests: checkout without a gateway (2026-11-21)
+
+No payment gateway is active. Checkout for a paid course or paid standalone exam is a request form; staff check the payment outside the site and approve, which grants access (ADR-056). The browser sends only the item slug and contact details; the price shown and stored is always the server's.
+
+### Learner
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/checkout/item/?course={slug}` or `?exam={slug}` | Signed in. `{kind, slug, title, price, pending_request, instructions}`. 404 for unpublished or unknown items |
+| POST | `/access-requests/` | `{course\|exam: slug, full_name, phone, payment_reference?, message?}` → 201 with the request. Errors: 404 `not_available`, 400 `free_item` (free items are opened directly), 409 `already_enrolled`, `already_has_access`, `already_requested`, and 403 `email_unverified` when verification is enforced. Throttle scope `access_request` (10/hour). Emails the notify address from the worker |
+| GET | `/me/access-requests/` | Own requests, paginated, newest first |
+| POST | `/me/access-requests/{number}/cancel/` | Pending only; another user's number answers 404 |
+
+### Staff
+
+| Method | Path | Permission |
+| --- | --- | --- |
+| GET | `/admin/commerce/requests/` | manage_enrollments or manage_orders. `?status= ?kind= ?search= ?user=` |
+| POST | `/admin/commerce/requests/{id}/approve/` `{note?}` | Same. Grants the enrollment or exam access (idempotent, audited) |
+| POST | `/admin/commerce/requests/{id}/reject/` `{note}` | Same. Note required; shown to the learner |
+| GET | `/admin/users/{id}/access/` | learning.manage_enrollments. Courses, exam accesses, batches and requests for one user |
+| GET | `/admin/access/options/` | Same. Courses, paid exams and batches for the pickers |
+| POST | `/admin/users/{id}/exam-access/` `{exam}` | Same. Adds or restores access to a paid exam |
+| POST | `/admin/exam-access/{id}/revoke/` | Same |
+
+Courses are added and removed through the existing `/admin/learning/enrollments/` endpoints, and batches through `/admin/live-classes/batches/{id}/members/`.
+
 ## Live classes (M6)
 
 ### Learner

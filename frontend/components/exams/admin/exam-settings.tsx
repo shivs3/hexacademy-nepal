@@ -23,6 +23,7 @@ type Draft = {
   slug: string;
   instructions: string;
   course: number | null;
+  price: string;
   kind: ExamKind;
   duration_minutes: string;
   opens_at: string; // datetime-local in the browser's zone
@@ -49,6 +50,11 @@ const isoOrNull = (value: string) => {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? value : d.toISOString();
 };
+/** "250" → "250.00" so an untouched price never counts as a change; other text goes to the server to reject. */
+const moneyOrRaw = (value: string) => {
+  const v = value.trim() || "0";
+  return /^\d+(\.\d{1,2})?$/.test(v) ? Number(v).toFixed(2) : v;
+};
 const intOrNull = (value: string) => (value.trim() === "" ? null : /^\d+$/.test(value.trim()) ? Number(value.trim()) : value.trim());
 
 function toDraft(e: AdminExam): Draft {
@@ -57,6 +63,7 @@ function toDraft(e: AdminExam): Draft {
     slug: e.slug,
     instructions: e.instructions,
     course: e.course,
+    price: e.price,
     kind: e.kind,
     duration_minutes: String(e.duration_minutes),
     opens_at: local(e.opens_at),
@@ -81,6 +88,7 @@ function payload(d: Draft): Record<string, unknown> {
     slug: d.slug,
     instructions: d.instructions,
     course: d.course,
+    price: d.course ? "0.00" : moneyOrRaw(d.price),
     kind: d.kind,
     duration_minutes: intOrNull(d.duration_minutes),
     opens_at: isoOrNull(d.opens_at),
@@ -200,6 +208,25 @@ export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; mana
                 ))}
                 {exam.course && !courses.data?.some((c) => c.id === exam.course) && <option value={exam.course}>{exam.course_title}</option>}
               </Select>
+            </Field>
+            <Field
+              label="Price (NPR)"
+              htmlFor="exam-price"
+              error={errors.price}
+              hint={
+                draft.course
+                  ? "Course exams come with the course, so they have no price of their own."
+                  : "0 makes the exam free for every signed-in learner. Above 0, learners send an access request and staff approve it."
+              }
+            >
+              <Input
+                id="exam-price"
+                inputMode="decimal"
+                className="sm:w-40"
+                value={draft.course ? "0" : draft.price}
+                disabled={!canEdit || draft.course !== null}
+                onChange={(e) => update({ price: e.target.value })}
+              />
             </Field>
             <Field label="Type" htmlFor="exam-kind" error={errors.kind}>
               <Select id="exam-kind" value={draft.kind} disabled={locked("kind")} onChange={(e) => update({ kind: e.target.value as ExamKind })}>

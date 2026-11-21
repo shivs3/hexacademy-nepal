@@ -32,6 +32,11 @@ class PaymentSettings(models.Model):
     order_ttl_minutes = models.PositiveIntegerField(
         default=60, help_text="Unpaid orders expire after this long (bank transfers awaiting review do not)."
     )
+    # Access requests: learners ask for a paid course or exam, staff approve.
+    request_notify_email = models.EmailField(
+        default="hexacademynepal@gmail.com", help_text="New access requests are emailed here."
+    )
+    request_instructions = models.TextField(blank=True)  # sanitised rich text: how to pay
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
@@ -370,3 +375,57 @@ class SandboxCharge(models.Model):
 
     def __str__(self):
         return self.token
+
+
+class AccessRequest(TimeStampedModel):
+    """A learner asks for a paid course or exam (the checkout form). Staff check
+    the payment outside the site and approve, which grants access; nothing here
+    is ever treated as proof of payment on its own."""
+
+    class Kind(models.TextChoices):
+        COURSE = "course", "Course"
+        EXAM = "exam", "Exam"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting for review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    number = models.CharField(max_length=24, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="access_requests")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    course = models.ForeignKey(Course, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    exam = models.ForeignKey("assessments.Exam", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    # Snapshots, so the request still reads correctly if the item changes or goes.
+    item_title = models.CharField(max_length=200)
+    price = models.DecimalField(**MONEY)
+    full_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=30)
+    payment_reference = models.CharField(max_length=120, blank=True)
+    message = models.TextField(blank=True)  # plain text
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    staff_note = models.TextField(blank=True)
+    handled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    handled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=Q(price__gte=0), name="commerce_accessrequest_price_non_negative"),
+            models.UniqueConstraint(
+                fields=["user", "course"],
+                condition=Q(status="pending", course__isnull=False),
+                name="commerce_accessrequest_one_pending_course",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "exam"],
+                condition=Q(status="pending", exam__isnull=False),
+                name="commerce_accessrequest_one_pending_exam",
+            ),
+        ]
+
+    def __str__(self):
+        return self.number

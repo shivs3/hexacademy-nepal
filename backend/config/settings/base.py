@@ -214,6 +214,7 @@ REST_FRAMEWORK = {
         "exam_answer": "240/min",
         "newsletter": "10/hour",
         "payment": "30/min",
+        "access_request": "10/hour",
         "certificate_verify": "60/min",
     },
 }
@@ -226,8 +227,12 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
     "ENUM_NAME_OVERRIDES": {
+        "AccessRequestStatusEnum": "apps.commerce.models.AccessRequest.Status",
+        "AccessRequestKindEnum": "apps.commerce.models.AccessRequest.Kind",
+        "ExamAccessSourceEnum": "apps.assessments.models.ExamAccess.Source",
         "ContentStatusEnum": "apps.cms.models.Page.Status",
         "EnrollmentStatusEnum": "apps.learning.models.Enrollment.Status",
+        "EnrollmentSourceEnum": "apps.learning.models.Enrollment.Source",
         "MediaKindEnum": "apps.cms.models.MediaAsset.Kind",
         "ResourceKindEnum": "apps.catalog.models.LessonResource.Kind",
         "LanguageEnum": LANGUAGES,

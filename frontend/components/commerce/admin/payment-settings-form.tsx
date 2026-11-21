@@ -17,7 +17,10 @@ import { errorMessage, isApiError } from "@/lib/api/errors";
 import { formatDateTime } from "@/lib/utils";
 import type { PaymentSettings } from "@/types/commerce";
 
-type Draft = Pick<PaymentSettings, "khalti_enabled" | "esewa_enabled" | "bank_transfer_enabled" | "bank_transfer_instructions"> & {
+type Draft = Pick<
+  PaymentSettings,
+  "khalti_enabled" | "esewa_enabled" | "bank_transfer_enabled" | "bank_transfer_instructions" | "request_notify_email" | "request_instructions"
+> & {
   order_ttl_minutes: string;
 };
 
@@ -42,6 +45,8 @@ function SettingsEditor({ initial, onSaved }: { initial: PaymentSettings; onSave
     bank_transfer_enabled: initial.bank_transfer_enabled,
     bank_transfer_instructions: initial.bank_transfer_instructions,
     order_ttl_minutes: String(initial.order_ttl_minutes),
+    request_notify_email: initial.request_notify_email,
+    request_instructions: initial.request_instructions,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -53,6 +58,10 @@ function SettingsEditor({ initial, onSaved }: { initial: PaymentSettings; onSave
     e.preventDefault();
     setErrors({});
     setFormError(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.request_notify_email.trim())) {
+      setErrors({ request_notify_email: "Enter an email address." });
+      return;
+    }
     if (!/^\d{1,5}$/.test(draft.order_ttl_minutes)) {
       setErrors({ order_ttl_minutes: "Enter whole minutes." });
       return;
@@ -61,6 +70,7 @@ function SettingsEditor({ initial, onSaved }: { initial: PaymentSettings; onSave
     try {
       const saved = await api.patch<PaymentSettings>("/admin/commerce/settings/", {
         ...draft,
+        request_notify_email: draft.request_notify_email.trim(),
         order_ttl_minutes: Number(draft.order_ttl_minutes),
       });
       toast.success("Payment settings saved.");
@@ -76,6 +86,46 @@ function SettingsEditor({ initial, onSaved }: { initial: PaymentSettings; onSave
   return (
     <form onSubmit={save} className="flex max-w-3xl flex-col gap-6" noValidate>
       {formError && <Alert tone="danger">{formError}</Alert>}
+      <Card>
+        <CardHeader>
+          <CardTitle>Checkout requests</CardTitle>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <p className="text-sm text-muted">
+            Learners send a request for each paid course or exam. You confirm the payment, then approve it under Commerce → Access requests.
+          </p>
+          <Field
+            label="Email new requests to"
+            htmlFor="pay-request-email"
+            error={errors.request_notify_email}
+            hint="Each request is also saved in Access requests, so nothing is lost if an email is delayed."
+            required
+          >
+            <Input
+              id="pay-request-email"
+              type="email"
+              className="sm:w-96"
+              value={draft.request_notify_email}
+              onChange={(e) => update({ request_notify_email: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="How to pay (shown on the request form)"
+            htmlFor="pay-request-instructions"
+            error={errors.request_instructions}
+            hint="eSewa or Khalti number, bank account, QR details, who to call. Leave empty for a short default message."
+          >
+            <RichTextEditor
+              id="pay-request-instructions"
+              value={draft.request_instructions}
+              onChange={(html) => update({ request_instructions: html })}
+              invalid={Boolean(errors.request_instructions)}
+              minimal
+            />
+          </Field>
+        </CardBody>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Online gateways</CardTitle>

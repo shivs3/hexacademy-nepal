@@ -9,7 +9,7 @@ export type ExamKind = "practice" | "formal";
 export type ExamStatus = "draft" | "published" | "closed";
 export type ResultRelease = "immediate" | "after_close" | "manual";
 export type AttemptStatus = "in_progress" | "submitted" | "expired";
-export type Availability = "available" | "in_progress" | "not_open" | "closed" | "not_enrolled" | "email_unverified" | "no_attempts_left";
+export type Availability = "available" | "in_progress" | "not_open" | "closed" | "not_enrolled" | "not_purchased" | "email_unverified" | "no_attempts_left";
 
 // --- Learner -----------------------------------------------------------------
 
@@ -44,6 +44,11 @@ export type LearnerExam = {
   availability: Availability;
   attempts_used: number;
   open_attempt_id: number | null;
+  /** Decimal string; above 0 only for standalone exams. */
+  price: string;
+  is_free: boolean;
+  /** False for a paid exam the learner hasn't been given access to. */
+  has_access: boolean;
 };
 
 export type LearnerExamDetail = LearnerExam & {
@@ -227,6 +232,8 @@ export type AdminExamSummary = {
   result_release: ResultRelease;
   results_published_at: string | null;
   updated_at: string;
+  /** Decimal string; 0 means free. */
+  price: string;
 };
 
 export type AdminExam = AdminExamSummary & {

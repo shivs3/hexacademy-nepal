@@ -21,6 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         { href: "/dashboard/exams", label: "Exams", icon: "exams" },
         { href: "/dashboard/certificates", label: "Certificates", icon: "certificates" },
         { href: "/dashboard/orders", label: "Orders", icon: "orders" },
+        { href: "/dashboard/requests", label: "Access requests", icon: "requests" },
         { href: "/dashboard/notifications", label: unread ? `Notifications (${unread > 99 ? "99+" : unread})` : "Notifications", icon: "notifications" },
         { href: "/dashboard/profile", label: "Profile & security", icon: "profile" },
       ],

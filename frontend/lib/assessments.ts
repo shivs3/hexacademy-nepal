@@ -40,6 +40,7 @@ export const AVAILABILITY_TEXT: Record<Availability, string> = {
   not_open: "Not open yet",
   closed: "Closed",
   not_enrolled: "Enroll in the course to take this exam",
+  not_purchased: "Paid exam: request access to take it",
   email_unverified: "Verify your email to take this exam",
   no_attempts_left: "No attempts left",
 };

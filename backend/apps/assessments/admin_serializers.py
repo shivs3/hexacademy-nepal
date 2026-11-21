@@ -257,12 +257,16 @@ class AdminExamListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "slug", "course", "course_title", "kind", "status", "duration_minutes", "opens_at",
             "closes_at", "question_total", "attempt_total", "result_release", "results_published_at", "updated_at",
+            "price",
         ]  # fmt: skip
 
 
 class AdminExamSerializer(AdminExamListSerializer):
     course = serializers.PrimaryKeyRelatedField(queryset=Course.objects.all(), allow_null=True, required=False)
     pass_marks = serializers.DecimalField(**MARK_FIELD, min_value=Decimal("0"), allow_null=True, required=False)
+    price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("1000000"), required=False
+    )
     total_marks = serializers.SerializerMethodField()
     drawn_questions = serializers.SerializerMethodField()
     abilities = serializers.SerializerMethodField()
@@ -348,6 +352,10 @@ class AdminExamSerializer(AdminExamListSerializer):
             raise serializers.ValidationError({"closes_at": ["The exam must close after it opens."]})
         if get("question_count") == 0:
             raise serializers.ValidationError({"question_count": ["Draw at least one question, or leave it empty."]})
+        if (get("price") or 0) > 0 and get("course"):
+            raise serializers.ValidationError(
+                {"price": ["A course exam is included with the course. Remove the course or set the price to 0."]}
+            )
         if get("max_attempts") == 0:
             raise serializers.ValidationError({"max_attempts": ["Allow at least one attempt, or leave it empty."]})
         return attrs

@@ -12,6 +12,8 @@ import { Alert, Badge, PageHeader } from "@/components/ui/feedback";
 import { serverGetOrNull } from "@/lib/api/server";
 import { requireUser } from "@/lib/auth";
 import { ATTEMPT_STATUS, AVAILABILITY_TEXT, EXAM_KIND_LABEL, attemptsLeftText, formatMarks } from "@/lib/assessments";
+import { formatPrice } from "@/lib/catalog";
+import { examCheckoutHref } from "@/lib/commerce";
 import { formatDateTime } from "@/lib/utils";
 import type { LearnerExamDetail } from "@/types/assessments";
 
@@ -110,6 +112,12 @@ export default async function ExamDetailPage({ params }: Props) {
 
         <Card className="self-start">
           <CardBody className="flex flex-col gap-3">
+            {!exam.is_free && (
+              <p className="flex items-baseline justify-between text-sm">
+                <span className="text-muted">Price</span>
+                <span className="text-lg font-semibold text-navy">{formatPrice(exam.price)}</span>
+              </p>
+            )}
             <p className="text-sm text-muted">{attemptsLeftText(exam.max_attempts, exam.attempts_used)}</p>
             {exam.opens_at && <p className="text-sm text-muted">Opens {formatDateTime(exam.opens_at)}</p>}
             {exam.closes_at && <p className="text-sm text-muted">Closes {formatDateTime(exam.closes_at)}</p>}
@@ -117,6 +125,15 @@ export default async function ExamDetailPage({ params }: Props) {
               <StartExamButton slug={exam.slug} resumeId={exam.open_attempt_id} />
             ) : exam.availability === "email_unverified" ? (
               <VerifyEmailNotice email={user.email}>This is a formal exam, so it needs a verified email address.</VerifyEmailNotice>
+            ) : exam.availability === "not_purchased" ? (
+              <>
+                <Alert tone="info">
+                  This is a paid exam. Send a request and we&apos;ll add it to your account once your payment is confirmed.
+                </Alert>
+                <Button asChild>
+                  <Link href={examCheckoutHref(exam.slug)}>Request access</Link>
+                </Button>
+              </>
             ) : exam.availability === "not_enrolled" && exam.course ? (
               <>
                 <Alert tone="info">Enroll in the course to take this exam.</Alert>

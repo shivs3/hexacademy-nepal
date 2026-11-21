@@ -14,11 +14,12 @@ export default async function UsersPage() {
   if (!hasPerm(user, "accounts.view_user_directory")) redirect("/admin");
   return (
     <>
-      <PageHeader title="Users" description="Search accounts, manage access and assign staff roles." />
+      <PageHeader title="Users" description="Search accounts, add or remove courses and exams, and assign staff roles." />
       <UserDirectory
         currentUserId={user.id}
         canManageStatus={hasPerm(user, "accounts.manage_user_status")}
         canAssignRoles={hasPerm(user, "accounts.assign_roles")}
+        canManageAccess={hasPerm(user, "learning.manage_enrollments")}
       />
     </>
   );

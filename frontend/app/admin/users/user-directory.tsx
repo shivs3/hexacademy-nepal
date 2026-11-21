@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, Users } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,13 @@ export function UserDirectory({
   currentUserId,
   canManageStatus,
   canAssignRoles,
+  canManageAccess = false,
 }: {
   currentUserId: number;
   canManageStatus: boolean;
   canAssignRoles: boolean;
+  /** Courses, exams and batches on the account (`learning.manage_enrollments`). */
+  canManageAccess?: boolean;
 }) {
   const toast = useToast();
   const [filters, setFilters] = useState<Filters>({ search: "", role: "", is_active: "", page: 1 });
@@ -184,6 +188,11 @@ export function UserDirectory({
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
+                          {canManageAccess && (
+                            <Button asChild size="sm" variant="outline">
+                              <Link href={`/admin/users/${u.id}`}>Access</Link>
+                            </Button>
+                          )}
                           {canAssignRoles && !isSelf && !isSuper && (
                             <Button size="sm" variant="outline" onClick={() => setRolesTarget(u)}>
                               Roles

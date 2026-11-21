@@ -32,7 +32,7 @@ from apps.audit import services as audit
 from apps.learning.services import active_enrollment
 from common.exceptions import ConflictError, DomainError
 
-from .models import AttemptAnswer, AttemptQuestion, Exam, ExamAttempt, Question
+from .models import AttemptAnswer, AttemptQuestion, Exam, ExamAccess, ExamAttempt, Question
 from .services import media_or_none
 
 _rng = random.SystemRandom()
@@ -45,15 +45,25 @@ def grace() -> timedelta:
 # --- Eligibility ---------------------------------------------------------------------
 
 
+def has_exam_access(user, exam: Exam) -> bool:
+    return ExamAccess.objects.filter(user=user, exam=exam, status=ExamAccess.Status.ACTIVE).exists()
+
+
 def attempts_used(user, exam: Exam) -> int:
     return ExamAttempt.objects.filter(exam=exam, user=user).count()
 
 
 def eligibility(
-    user, exam: Exam, *, now=None, enrolled: bool | None = None, used: int | None = None
+    user,
+    exam: Exam,
+    *,
+    now=None,
+    enrolled: bool | None = None,
+    used: int | None = None,
+    has_access: bool | None = None,
 ) -> tuple[bool, str]:
-    """(allowed, reason). Reasons: unavailable, not_open, closed, not_enrolled, email_unverified,
-    no_attempts_left. Practice tests don't need a verified email; formal exams do.
+    """(allowed, reason). Reasons: unavailable, not_open, closed, not_enrolled, not_purchased,
+    email_unverified, no_attempts_left. Practice tests don't need a verified email; formal exams do.
 
     List views may pass `enrolled` and `used` when they have already loaded
     them for every row; otherwise each is queried here.
@@ -70,6 +80,11 @@ def eligibility(
             enrolled = active_enrollment(user, exam.course) is not None
         if not enrolled:
             return False, "not_enrolled"
+    elif not exam.is_free:
+        if has_access is None:
+            has_access = has_exam_access(user, exam)
+        if not has_access:
+            return False, "not_purchased"
     if exam.kind == Exam.Kind.FORMAL and verification_required() and not user.email_verified:
         return False, "email_unverified"
     if exam.max_attempts is not None and (attempts_used(user, exam) if used is None else used) >= exam.max_attempts:
@@ -82,6 +97,7 @@ DENIALS = {
     "not_open": (403, "This exam has not opened yet."),
     "closed": (403, "This exam has closed."),
     "not_enrolled": (403, "Enroll in the course to take this exam."),
+    "not_purchased": (403, "This is a paid exam. Request access to take it."),
     "email_unverified": (403, "Verify your email address to take this exam."),
     "no_attempts_left": (403, "You have used all your attempts for this exam."),
 }

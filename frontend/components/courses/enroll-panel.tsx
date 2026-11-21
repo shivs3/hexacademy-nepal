@@ -45,7 +45,7 @@ export function EnrollPanel({ slug, isFree, signedIn, enrolled, contactEmail }: 
       <div className="flex flex-col gap-3">
         <Button asChild size="lg" className="w-full">
           <Link href={signedIn ? checkout : `/login?next=${encodeURIComponent(checkout)}`}>
-            {signedIn ? "Buy now" : "Sign in to buy"}
+            {signedIn ? "Request access" : "Sign in to request access"}
           </Link>
         </Button>
         {contactEmail && (

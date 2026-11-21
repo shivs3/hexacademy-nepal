@@ -172,6 +172,10 @@ export type PaymentSettings = {
   bank_transfer_enabled: boolean;
   bank_transfer_instructions: string;
   order_ttl_minutes: number;
+  /** Where checkout (access) requests are emailed. */
+  request_notify_email: string;
+  /** Sanitised rich text shown on the checkout request form: how to pay. */
+  request_instructions: string;
   updated_at: string;
   gateways: GatewayStatus[];
 };
