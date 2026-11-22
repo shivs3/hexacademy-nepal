@@ -169,6 +169,10 @@ Custom permissions: `commerce.view_orders`, `manage_orders`, `manage_refunds`, `
 - `assessments_exam` gains `category` (SET_NULL, deleting a category keeps its exams), `summary` (300, plain text) and `sold_separately` (default false).
 - The price check is now `assessments_exam_paid_only_on_its_own`: price = 0, or no course, or `sold_separately`. A standalone exam is always saved with `sold_separately` false.
 
+## Exam offer prices (2026-11-22)
+
+- `assessments_exam` gains `sale_price` (Decimal 10,2, null) and `sale_ends_at` (null). CHECK `assessments_exam_sale_below_price`: null, or 0 < sale_price < price. An offer therefore never makes a paid exam free. Migration `assessments.0004`.
+
 ## Live classes, assignments, notifications and certificates (M6)
 
 ```

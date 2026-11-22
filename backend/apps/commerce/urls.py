@@ -30,6 +30,8 @@ urlpatterns = [
         name="admin-exam-access-revoke",
     ),
     path("admin/access/options/", access_views.AdminAccessOptionsView.as_view(), name="admin-access-options"),
+    path("admin/access/people/", access_views.AdminAccessPeopleView.as_view(), name="admin-access-people"),
+    path("admin/access/assign/", access_views.AdminAssignAccessView.as_view(), name="admin-access-assign"),
     path("payments/methods/", views.PaymentMethodsView.as_view(), name="payment-methods"),
     path("orders/quote/", views.QuoteView.as_view(), name="order-quote"),
     path("orders/", views.OrderCreateView.as_view(), name="order-create"),

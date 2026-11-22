@@ -68,7 +68,7 @@ def create(user, *, course: Course | None = None, exam: Exam | None = None, requ
         kind, title, price = AccessRequest.Kind.COURSE, course.title, course.current_price()
     else:
         _check_exam(user, exam)
-        kind, title, price = AccessRequest.Kind.EXAM, exam.title, exam.price
+        kind, title, price = AccessRequest.Kind.EXAM, exam.title, exam.current_price()
     pending = AccessRequest.objects.filter(user=user, status=AccessRequest.Status.PENDING)
     if pending.filter(course=course).exists() if course else pending.filter(exam=exam).exists():
         raise ConflictError("You have already sent a request for this. We will be in touch.", code="already_requested")

@@ -26,6 +26,7 @@ const item: CheckoutItem = {
   slug: "loksewa-mock",
   title: "Loksewa mock",
   price: "200.00",
+  list_price: "200.00",
   pending_request: null,
   instructions: "<p>Pay to eSewa 98XXXXXXXX</p>",
 };

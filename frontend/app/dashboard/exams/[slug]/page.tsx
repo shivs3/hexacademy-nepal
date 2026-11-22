@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { VerifyEmailNotice } from "@/components/account/verify-email-notice";
 import { RichText } from "@/components/cms/rich-text";
+import { PriceTag } from "@/components/courses/price-tag";
 import { StartExamButton } from "@/components/exams/start-exam-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,6 @@ import { Alert, Badge, PageHeader } from "@/components/ui/feedback";
 import { serverGetOrNull } from "@/lib/api/server";
 import { requireUser } from "@/lib/auth";
 import { ATTEMPT_STATUS, AVAILABILITY_TEXT, EXAM_KIND_LABEL, attemptsLeftText, formatMarks } from "@/lib/assessments";
-import { formatPrice } from "@/lib/catalog";
 import { examCheckoutHref } from "@/lib/commerce";
 import { formatDateTime } from "@/lib/utils";
 import type { LearnerExamDetail } from "@/types/assessments";
@@ -115,7 +115,7 @@ export default async function ExamDetailPage({ params }: Props) {
             {!exam.is_free && (
               <p className="flex items-baseline justify-between text-sm">
                 <span className="text-muted">Price</span>
-                <span className="text-lg font-semibold text-navy">{formatPrice(exam.price)}</span>
+                <PriceTag pricing={{ ...exam, currency: "NPR" }} className="justify-end text-right" />
               </p>
             )}
             <p className="text-sm text-muted">{attemptsLeftText(exam.max_attempts, exam.attempts_used)}</p>

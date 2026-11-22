@@ -95,7 +95,7 @@ export default async function PublicExamPage({ params }: Props) {
           </div>
 
           <aside className="self-start rounded-[var(--radius-card)] bg-white p-6 text-body shadow-lg">
-            <ExamPrice exam={exam} className="text-3xl" />
+            <ExamPrice exam={exam} size="lg" />
             {(exam.opens_at || exam.closes_at) && (
               <ul className="mt-3 space-y-1 text-sm text-muted">
                 {exam.opens_at && (

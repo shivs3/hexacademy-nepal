@@ -64,6 +64,7 @@ class LearnerExamSerializer(serializers.ModelSerializer):
     attempts_used = serializers.SerializerMethodField()
     open_attempt_id = serializers.SerializerMethodField()
     is_free = serializers.BooleanField(read_only=True)
+    current_price = serializers.SerializerMethodField()
     has_access = serializers.SerializerMethodField()
 
     class Meta:
@@ -71,8 +72,11 @@ class LearnerExamSerializer(serializers.ModelSerializer):
         fields = [
             "id", "slug", "title", "kind", "course", "duration_minutes", "opens_at", "closes_at", "max_attempts",
             "total_marks", "question_total", "availability", "attempts_used", "open_attempt_id",
-            "price", "is_free", "has_access",
+            "price", "current_price", "sale_ends_at", "is_free", "has_access",
         ]  # fmt: skip
+
+    def get_current_price(self, obj) -> str:
+        return f"{obj.current_price():.2f}"
 
     def _enrolled(self, obj) -> bool:
         if not obj.course_id:
@@ -85,15 +89,19 @@ class LearnerExamSerializer(serializers.ModelSerializer):
             cache[obj.course_id] = attempts.active_enrollment(self.context["request"].user, obj.course) is not None
         return cache[obj.course_id]
 
-    def get_has_access(self, obj) -> bool:
-        """Whether the learner may take this exam as far as payment goes:
-        free, included with their course, or granted by staff."""
-        if obj.is_free or self._enrolled(obj):
-            return True
+    def _granted(self, obj) -> bool:
         ids = self.context.get("accessible_exam_ids")
         if ids is not None:
             return obj.pk in ids
-        return attempts.has_exam_access(self.context["request"].user, obj)
+        cache = self.context.setdefault("_granted", {})
+        if obj.pk not in cache:
+            cache[obj.pk] = attempts.has_exam_access(self.context["request"].user, obj)
+        return cache[obj.pk]
+
+    def get_has_access(self, obj) -> bool:
+        """Whether the learner may take this exam as far as payment goes:
+        free, included with their course, or granted by staff."""
+        return (obj.offered_on_its_own and obj.is_free) or self._enrolled(obj) or self._granted(obj)
 
     def _mine(self, obj):
         if hasattr(obj, "my_attempts"):  # prefetched by the list view
@@ -132,7 +140,7 @@ class LearnerExamSerializer(serializers.ModelSerializer):
             obj,
             enrolled=self._enrolled(obj),
             used=len(obj.my_attempts) if hasattr(obj, "my_attempts") else None,
-            has_access=self.get_has_access(obj),
+            has_access=self._granted(obj),
         )
         return "available" if allowed else reason
 

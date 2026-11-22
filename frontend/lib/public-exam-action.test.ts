@@ -14,6 +14,8 @@ const base: PublicExam = {
   course: null,
   offer: "free",
   price: "0.00",
+  current_price: "0.00",
+  sale_ends_at: null,
   is_free: true,
   duration_minutes: 30,
   question_total: 20,
@@ -29,7 +31,7 @@ function learner(availability: LearnerExam["availability"], extra: Partial<Learn
   return {
     id: 1, slug: base.slug, title: base.title, kind: "practice", course: null, duration_minutes: 30, opens_at: null, closes_at: null,
     max_attempts: null, total_marks: "20.00", question_total: 20, availability, attempts_used: 0, open_attempt_id: null,
-    price: "0.00", is_free: true, has_access: true, ...extra,
+    price: "0.00", current_price: "0.00", sale_ends_at: null, is_free: true, has_access: true, ...extra,
   };
 }
 

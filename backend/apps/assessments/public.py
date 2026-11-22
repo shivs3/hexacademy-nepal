@@ -5,7 +5,7 @@ question, option or answer is read here. Whether the visitor may start an exam
 is still decided by `attempts.eligibility` when they open it signed in.
 """
 
-from django.db.models import Count, Q
+from django.db.models import Case, Count, F, Q, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_field, inline_serializer
@@ -22,8 +22,8 @@ from .models import OFFERED_ON_ITS_OWN, Exam, ExamCategory
 ORDERINGS = {
     "newest": ["-published_at", "-id"],
     "title": ["title", "id"],
-    "price_low": ["price", "title"],
-    "price_high": ["-price", "title"],
+    "price_low": ["effective_price", "title"],
+    "price_high": ["-effective_price", "title"],
 }
 OFFERS = ("free", "paid", "course")
 
@@ -64,13 +64,15 @@ class PublicExamSerializer(serializers.ModelSerializer):
     course = ExamCourseRef(allow_null=True)
     offer = serializers.SerializerMethodField()
     is_free = serializers.BooleanField(read_only=True)
+    current_price = serializers.SerializerMethodField(help_text="The offer price while it lasts, else the price.")
     question_total = serializers.SerializerMethodField()
     total_marks = serializers.SerializerMethodField()
 
     class Meta:
         model = Exam
         fields = [
-            "slug", "title", "summary", "kind", "kind_label", "category", "course", "offer", "price", "is_free",
+            "slug", "title", "summary", "kind", "kind_label", "category", "course", "offer", "price", "current_price",
+            "sale_ends_at", "is_free",
             "duration_minutes", "question_total", "total_marks", "opens_at", "closes_at", "max_attempts",
             "negative_marking",
         ]  # fmt: skip
@@ -78,6 +80,9 @@ class PublicExamSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.ChoiceField(choices=OFFERS))
     def get_offer(self, obj):
         return offer_of(obj)
+
+    def get_current_price(self, obj) -> str:
+        return f"{obj.current_price():.2f}"
 
     def get_question_total(self, obj) -> int:
         return services.drawn_count(obj, services.pool_summary(obj)["pool_size"])
@@ -131,7 +136,12 @@ class PublicExamListView(generics.ListAPIView):
             qs = qs.filter(OFFERED_ON_ITS_OWN, price__gt=0)
         elif offer == "course":
             qs = qs.exclude(OFFERED_ON_ITS_OWN)
-        qs = services.with_pool_totals(qs)
+        # Sort by what a visitor pays today, counting offers that are still running.
+        now = timezone.now()
+        running = Q(sale_price__isnull=False) & (Q(sale_ends_at__isnull=True) | Q(sale_ends_at__gt=now))
+        qs = services.with_pool_totals(qs).annotate(
+            effective_price=Case(When(running, then=F("sale_price")), default=F("price"))
+        )
         return qs.order_by(*ORDERINGS.get(params.get("ordering", ""), ORDERINGS["newest"]))
 
 

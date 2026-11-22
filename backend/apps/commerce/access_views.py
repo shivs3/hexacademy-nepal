@@ -16,6 +16,8 @@ Staff (`learning.manage_enrollments`):
   POST /admin/users/<id>/exam-access/                 {exam}
   POST /admin/exam-access/<id>/revoke/
   GET  /admin/access/options/                         what can be granted
+  GET  /admin/access/people/?search=                  find active people to assign to
+  POST /admin/access/assign/                          {users, courses, exams}: many at once
 
 Course enrollments themselves are granted and revoked through the existing
 /admin/learning/enrollments/ endpoints, and batches through
@@ -23,6 +25,7 @@ Course enrollments themselves are granted and revoked through the existing
 """
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -36,6 +39,7 @@ from apps.assessments import access as exam_access
 from apps.assessments.models import OFFERED_ON_ITS_OWN, Exam, ExamAccess
 from apps.catalog.models import Course
 from apps.cms import sanitize
+from apps.learning import services as enrollments
 from apps.learning.models import Enrollment
 from apps.live_classes.models import Batch, BatchMembership
 from common.exceptions import DomainError
@@ -45,8 +49,11 @@ from . import access_requests
 from .access_serializers import (
     AccessExamSerializer,
     AccessOptionsSerializer,
+    AccessPersonSerializer,
     AccessRequestInputSerializer,
     AdminAccessRequestSerializer,
+    AssignAccessResultSerializer,
+    AssignAccessSerializer,
     CheckoutItemSerializer,
     DecisionSerializer,
     GrantExamSerializer,
@@ -76,13 +83,25 @@ class CheckoutItemView(APIView):
         pending = AccessRequest.objects.filter(user=request.user, status=AccessRequest.Status.PENDING)
         if course_slug:
             course = get_object_or_404(Course.objects.filter(status=Course.Status.PUBLISHED), slug=course_slug)
-            item = {"kind": "course", "slug": course.slug, "title": course.title, "price": course.current_price()}
+            item = {
+                "kind": "course",
+                "slug": course.slug,
+                "title": course.title,
+                "price": course.current_price(),
+                "list_price": course.price,
+            }
             pending = pending.filter(course=course)
         elif exam_slug:
             exam = get_object_or_404(
                 Exam.objects.filter(OFFERED_ON_ITS_OWN, status=Exam.Status.PUBLISHED), slug=exam_slug
             )
-            item = {"kind": "exam", "slug": exam.slug, "title": exam.title, "price": exam.price}
+            item = {
+                "kind": "exam",
+                "slug": exam.slug,
+                "title": exam.title,
+                "price": exam.current_price(),
+                "list_price": exam.price,
+            }
             pending = pending.filter(exam=exam)
         else:
             raise DomainError("Choose a course or an exam.")
@@ -224,14 +243,73 @@ class AdminAccessOptionsView(APIView):
     @extend_schema(responses=AccessOptionsSerializer)
     def get(self, request):
         courses = Course.objects.exclude(status=Course.Status.DRAFT).order_by("title")
-        exams = Exam.objects.filter(OFFERED_ON_ITS_OWN, status=Exam.Status.PUBLISHED).order_by("title")
+        exams = Exam.objects.filter(status=Exam.Status.PUBLISHED).select_related("course").order_by("title")
         batches = Batch.objects.filter(status=Batch.Status.ACTIVE).select_related("course").order_by("name")
         payload = {
             "courses": [
                 {"id": c.pk, "title": c.title, "price": c.current_price(), "detail": c.get_status_display()}
                 for c in courses
             ],
-            "exams": [{"id": e.pk, "title": e.title, "price": e.price, "detail": e.get_kind_display()} for e in exams],
+            "exams": [
+                {
+                    "id": e.pk,
+                    "title": e.title,
+                    "price": e.current_price(),
+                    "detail": f"{e.get_kind_display()} · {e.course.title}" if e.course_id else e.get_kind_display(),
+                }
+                for e in exams
+            ],
             "batches": [{"id": b.pk, "title": b.name, "price": 0, "detail": b.course.title} for b in batches],
         }
         return Response(AccessOptionsSerializer(payload).data)
+
+
+PEOPLE_LIMIT = 20
+
+
+class AdminAccessPeopleView(APIView):
+    """A small lookup for the assign page: name and email only, active
+    accounts, at least two characters typed. Staff who grant access already
+    find people by email, so this shows nothing new to them."""
+
+    permission_classes = [HasPerm(MANAGE_ENROLLMENTS)]
+
+    @extend_schema(parameters=[OpenApiParameter("search", str)], responses=AccessPersonSerializer(many=True))
+    def get(self, request):
+        term = request.query_params.get("search", "").strip()[:100]
+        if len(term) < 2:
+            return Response([])
+        people = (
+            get_user_model()
+            .objects.filter(is_active=True)
+            .filter(Q(email__icontains=term) | Q(full_name__icontains=term) | Q(phone__icontains=term))
+            .order_by("full_name", "email")[:PEOPLE_LIMIT]
+        )
+        return Response(AccessPersonSerializer(people, many=True).data)
+
+
+class AdminAssignAccessView(APIView):
+    """Give several people several courses and exams in one go. All or
+    nothing: one failure rolls the whole assignment back. Each grant goes
+    through the same service (and audit entry) as a single grant."""
+
+    permission_classes = [HasPerm(MANAGE_ENROLLMENTS)]
+
+    @extend_schema(request=AssignAccessSerializer, responses=AssignAccessResultSerializer)
+    def post(self, request):
+        data = AssignAccessSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        v = data.validated_data
+        results = []
+        with transaction.atomic():
+            for user in v["users"]:
+                row = {"user": user.pk, "user_name": user.get_full_name() or user.email}
+                for course in v["courses"]:
+                    _, added = enrollments.grant(user, course, actor=request.user, request=request)
+                    results.append({**row, "kind": "course", "item": course.pk, "title": course.title, "added": added})
+                for exam in v["exams"]:
+                    _, added = exam_access.grant(user, exam, actor=request.user, request=request)
+                    results.append({**row, "kind": "exam", "item": exam.pk, "title": exam.title, "added": added})
+        added = sum(r["added"] for r in results)
+        payload = {"added": added, "already_had": len(results) - added, "results": results}
+        return Response(AssignAccessResultSerializer(payload).data)

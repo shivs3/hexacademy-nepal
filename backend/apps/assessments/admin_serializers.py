@@ -6,6 +6,7 @@ serializers.py and never import from here.
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -285,7 +286,7 @@ class AdminExamListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "slug", "course", "course_title", "kind", "status", "duration_minutes", "opens_at",
             "closes_at", "question_total", "attempt_total", "result_release", "results_published_at", "updated_at",
-            "price", "sold_separately", "category", "category_name",
+            "price", "sale_price", "sale_ends_at", "sold_separately", "category", "category_name",
         ]  # fmt: skip
 
 
@@ -295,6 +296,9 @@ class AdminExamSerializer(AdminExamListSerializer):
     pass_marks = serializers.DecimalField(**MARK_FIELD, min_value=Decimal("0"), allow_null=True, required=False)
     price = serializers.DecimalField(
         max_digits=10, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("1000000"), required=False
+    )
+    sale_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"), allow_null=True, required=False
     )
     total_marks = serializers.SerializerMethodField()
     drawn_questions = serializers.SerializerMethodField()
@@ -386,7 +390,7 @@ class AdminExamSerializer(AdminExamListSerializer):
             raise serializers.ValidationError({"question_count": ["Draw at least one question, or leave it empty."]})
         # Pricing is a business decision: only exam managers set it, not course instructors.
         user = self.context["request"].user
-        for field in ("price", "sold_separately"):
+        for field in ("price", "sale_price", "sale_ends_at", "sold_separately"):
             changed = field in attrs and attrs[field] != (
                 getattr(instance, field) if instance else Exam._meta.get_field(field).default
             )
@@ -398,9 +402,28 @@ class AdminExamSerializer(AdminExamListSerializer):
             raise serializers.ValidationError(
                 {"price": ["A course exam is included with the course. Offer it without the course to set a price."]}
             )
+        self._validate_offer(attrs, get, instance)
         if get("max_attempts") == 0:
             raise serializers.ValidationError({"max_attempts": ["Allow at least one attempt, or leave it empty."]})
         return attrs
+
+    @staticmethod
+    def _validate_offer(attrs, get, instance):
+        """An offer price sits strictly between 0 and the actual price, so it
+        never makes a paid exam free. Without an offer there is no end date."""
+        sale_price = get("sale_price")
+        if sale_price is None:
+            attrs["sale_ends_at"] = None
+            return
+        price = get("price") or Decimal("0")
+        if price <= 0:
+            raise serializers.ValidationError({"sale_price": ["Set the actual price before adding an offer price."]})
+        if sale_price >= price:
+            raise serializers.ValidationError({"sale_price": ["The offer price must be lower than the actual price."]})
+        ends = attrs.get("sale_ends_at")
+        unchanged = instance is not None and ends == instance.sale_ends_at
+        if ends is not None and not unchanged and ends <= timezone.now():
+            raise serializers.ValidationError({"sale_ends_at": ["The offer must end in the future."]})
 
 
 class ExamStatusSerializer(serializers.Serializer):

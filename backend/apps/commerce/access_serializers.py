@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from apps.assessments.models import OFFERED_ON_ITS_OWN, Exam, ExamAccess
+from apps.assessments.models import Exam, ExamAccess
 from apps.catalog.models import Course
 from apps.learning.models import Enrollment
 from apps.live_classes.models import BatchMembership
@@ -79,7 +79,8 @@ class CheckoutItemSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(choices=AccessRequest.Kind.choices)
     slug = serializers.CharField()
     title = serializers.CharField()
-    price = serializers.DecimalField(**MONEY)
+    price = serializers.DecimalField(**MONEY, help_text="What the learner pays now (the offer price while it lasts).")
+    list_price = serializers.DecimalField(**MONEY, help_text="The actual price, before any offer.")
     pending_request = MyAccessRequestSerializer(allow_null=True)
     instructions = serializers.CharField(help_text="Sanitised rich text: how to pay.")
 
@@ -169,9 +170,56 @@ class UserAccessSerializer(serializers.Serializer):
 
 
 class GrantExamSerializer(serializers.Serializer):
-    exam = serializers.PrimaryKeyRelatedField(
-        queryset=Exam.objects.filter(OFFERED_ON_ITS_OWN, status=Exam.Status.PUBLISHED)
+    # Staff may grant any published exam, course-only ones included.
+    exam = serializers.PrimaryKeyRelatedField(queryset=Exam.objects.filter(status=Exam.Status.PUBLISHED))
+
+
+MAX_ASSIGN_USERS = 100
+
+
+class AssignAccessSerializer(serializers.Serializer):
+    users = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.filter(is_active=True), many=True, allow_empty=False
     )
+    courses = serializers.PrimaryKeyRelatedField(
+        queryset=Course.objects.exclude(status=Course.Status.DRAFT), many=True, required=False, default=list
+    )
+    exams = serializers.PrimaryKeyRelatedField(
+        queryset=Exam.objects.filter(status=Exam.Status.PUBLISHED), many=True, required=False, default=list
+    )
+
+    def validate_users(self, users):
+        if len(users) > MAX_ASSIGN_USERS:
+            raise serializers.ValidationError(f"Assign to at most {MAX_ASSIGN_USERS} people at a time.")
+        return list({u.pk: u for u in users}.values())
+
+    def validate(self, attrs):
+        attrs["courses"] = list({c.pk: c for c in attrs["courses"]}.values())
+        attrs["exams"] = list({e.pk: e for e in attrs["exams"]}.values())
+        if not attrs["courses"] and not attrs["exams"]:
+            raise serializers.ValidationError({"courses": "Choose at least one course or exam."})
+        return attrs
+
+
+class AccessPersonSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    email = serializers.EmailField()
+
+
+class AssignResultSerializer(serializers.Serializer):
+    user = serializers.IntegerField()
+    user_name = serializers.CharField()
+    kind = serializers.ChoiceField(choices=["course", "exam"])
+    item = serializers.IntegerField()
+    title = serializers.CharField()
+    added = serializers.BooleanField(help_text="False when the person already had it.")
+
+
+class AssignAccessResultSerializer(serializers.Serializer):
+    added = serializers.IntegerField()
+    already_had = serializers.IntegerField()
+    results = AssignResultSerializer(many=True)
 
 
 class AccessOptionSerializer(serializers.Serializer):

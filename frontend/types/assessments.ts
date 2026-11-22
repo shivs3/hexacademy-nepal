@@ -26,6 +26,9 @@ export type PublicExam = {
   course: { title: string; slug: string } | null;
   offer: ExamOffer;
   price: string;
+  /** The offer price while it lasts, else `price`. */
+  current_price: string;
+  sale_ends_at: string | null;
   is_free: boolean;
   duration_minutes: number;
   question_total: number;
@@ -91,6 +94,9 @@ export type LearnerExam = {
   open_attempt_id: number | null;
   /** Decimal string; above 0 only for standalone exams. */
   price: string;
+  /** The offer price while it lasts, else `price`. */
+  current_price: string;
+  sale_ends_at: string | null;
   is_free: boolean;
   /** False for a paid exam the learner hasn't been given access to. */
   has_access: boolean;
@@ -279,6 +285,8 @@ export type AdminExamSummary = {
   updated_at: string;
   /** Decimal string; 0 means free. */
   price: string;
+  sale_price: string | null;
+  sale_ends_at: string | null;
   /** A course exam that can also be taken without the course. */
   sold_separately: boolean;
   category: number | null;

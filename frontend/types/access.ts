@@ -24,7 +24,10 @@ export type CheckoutItem = {
   kind: AccessRequestKind;
   slug: string;
   title: string;
+  /** What the learner pays now: the offer price while it lasts. */
   price: string;
+  /** The actual price, before any offer. */
+  list_price: string;
   pending_request: MyAccessRequest | null;
   /** Sanitised rich text set by staff: how to pay. */
   instructions: string;
@@ -87,3 +90,7 @@ export type UserAccess = {
 
 export type AccessOption = { id: number; title: string; price: string; detail: string };
 export type AccessOptions = { courses: AccessOption[]; exams: AccessOption[]; batches: AccessOption[] };
+
+export type AssignResult = { user: number; user_name: string; kind: "course" | "exam"; item: number; title: string; added: boolean };
+export type AssignAccessResult = { added: number; already_had: number; results: AssignResult[] };
+export type AccessPerson = { id: number; full_name: string; email: string };

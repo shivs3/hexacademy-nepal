@@ -105,6 +105,11 @@ export function UserAccessManager({
           <div className="flex flex-wrap gap-2">
             {user.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Deactivated</Badge>}
             {!user.email_verified && <Badge tone="warning">Email not verified</Badge>}
+            {user.is_active && (
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/admin/access?user=${user.id}`}>Assign several at once</Link>
+              </Button>
+            )}
           </div>
         }
       />

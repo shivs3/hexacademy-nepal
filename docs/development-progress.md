@@ -512,6 +512,14 @@ Update this file at the end of every milestone. Only record what was actually ex
 - New: `apps/assessments/public.py`, `ExamCategory`, migration `assessments.0003`, `lib/assessments.ts` `publicExamAction`, `components/exams/public-exam-card.tsx`; tests `test_exam_catalog.py`, `lib/public-exam-action.test.ts`.
 - Verified locally: 508 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 151 unit tests and the production build.
 
+## Exam offer prices and bulk assigning (2026-11-22)
+
+- Exams have an actual price and an optional offer price with an end date (`Exam.sale_price`, `sale_ends_at`, `current_price()`; migration `assessments.0004`). Exam cards, the exam page, the learner exam page and checkout show the offer with the actual price struck through; requests record the price paid today; sorting uses it. Exam managers edit it in exam settings ("Offer price", "Offer ends").
+- Admin → Learning → Assign access (`/admin/access`): search people, tick courses and exams, assign in one step; it shows what was added and what people already had. Each person's access page links to it with them chosen. Endpoints `GET /admin/access/people/`, `POST /admin/access/assign/` (ADR-058).
+- Any published exam can now be granted, including course exams; `attempts.eligibility` takes the grant (not "free") as `has_access`, and granted exams appear in the learner's exam list.
+- Tests: `apps/assessments/tests/test_exam_pricing.py` (19), `components/commerce/admin/assign-access.test.tsx`, `components/exams/public-exam-card.test.tsx`.
+- Verified locally: 527 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 156 unit tests and the production build.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

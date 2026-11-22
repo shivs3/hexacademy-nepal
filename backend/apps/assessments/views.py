@@ -33,9 +33,10 @@ from .serializers import (
 def learner_exams(user):
     enrolled = Enrollment.objects.filter(user=user, status=Enrollment.Status.ACTIVE).values("course_id")
     attempted = ExamAttempt.objects.filter(user=user).values("exam_id")
+    granted = ExamAccess.objects.filter(user=user, status=ExamAccess.Status.ACTIVE).values("exam_id")
     return (
         Exam.objects.exclude(status=Exam.Status.DRAFT)
-        .filter(OFFERED_ON_ITS_OWN | Q(course_id__in=enrolled) | Q(pk__in=attempted))
+        .filter(OFFERED_ON_ITS_OWN | Q(course_id__in=enrolled) | Q(pk__in=attempted) | Q(pk__in=granted))
         .select_related("course")
     )
 

@@ -1,14 +1,15 @@
 import { Clock, ListChecks } from "lucide-react";
 import Link from "next/link";
 
+import { PriceTag } from "@/components/courses/price-tag";
 import { Badge } from "@/components/ui/feedback";
 import { EXAM_KIND_LABEL, formatMarks } from "@/lib/assessments";
-import { formatPrice } from "@/lib/catalog";
 import type { PublicExam } from "@/types/assessments";
 
-export function ExamPrice({ exam, className = "" }: { exam: PublicExam; className?: string }) {
-  if (exam.offer === "course") return <span className={`text-sm font-medium text-muted ${className}`}>Included with the course</span>;
-  return <span className={`font-semibold text-navy ${className}`}>{exam.is_free ? "Free" : formatPrice(exam.price)}</span>;
+/** The exam's price: the offer price with the actual price struck through while an offer runs. */
+export function ExamPrice({ exam, size = "md", className }: { exam: PublicExam; size?: "md" | "lg"; className?: string }) {
+  if (exam.offer === "course") return <span className={`text-sm font-medium text-muted ${className ?? ""}`}>Included with the course</span>;
+  return <PriceTag pricing={{ ...exam, currency: "NPR" }} size={size} className={className} />;
 }
 
 export function PublicExamCard({ exam, headingLevel = "h3" }: { exam: PublicExam; headingLevel?: "h2" | "h3" }) {

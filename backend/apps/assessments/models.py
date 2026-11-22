@@ -18,6 +18,7 @@ from django.contrib.postgres.indexes import GinIndex
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.catalog.models import Course
 from apps.cms.models import MediaAsset
@@ -217,9 +218,15 @@ class Exam(TimeStampedModel):
     # A course exam is included with the course. With `sold_separately` it is
     # also offered on its own (exam-only enrollment) at `price`. A standalone
     # exam is always on its own. A paid exam needs an ExamAccess grant, except
-    # for learners enrolled in its course.
+    # for learners enrolled in its course. Staff can also grant any published
+    # exam, course-only ones included.
     sold_separately = models.BooleanField(default=False)
+    # `price` is the actual (regular) price; `sale_price` an optional offer
+    # below it, until `sale_ends_at` (no end date: until removed). An offer is
+    # always above 0, so whether an exam is free never depends on a sale.
     price = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    sale_ends_at = models.DateTimeField(null=True, blank=True)
 
     published_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
@@ -247,6 +254,10 @@ class Exam(TimeStampedModel):
                 condition=Q(price=0) | Q(course__isnull=True) | Q(sold_separately=True),
                 name="assessments_exam_paid_only_on_its_own",
             ),
+            models.CheckConstraint(
+                condition=Q(sale_price__isnull=True) | (Q(sale_price__gt=0) & Q(sale_price__lt=models.F("price"))),
+                name="assessments_exam_sale_below_price",
+            ),
         ]
 
     def __str__(self):
@@ -255,6 +266,13 @@ class Exam(TimeStampedModel):
     @property
     def is_free(self):
         return self.price <= 0
+
+    def current_price(self, now=None) -> Decimal:
+        """What a learner pays right now: the offer price while it lasts."""
+        now = now or timezone.now()
+        if self.sale_price is not None and (self.sale_ends_at is None or self.sale_ends_at > now):
+            return self.sale_price
+        return self.price
 
     @property
     def offered_on_its_own(self) -> bool:

@@ -243,6 +243,15 @@ Public, no sign-in. Never returns questions, options or answers.
 - Staff: `/api/v1/admin/assessments/exam-categories/` CRUD (read for anyone who opens exams; writes need `assessments.manage_exams`; audited). Exams gain `category`, `summary`, `sold_separately`; changing `price` or `sold_separately` needs `manage_exams` (400 otherwise).
 - Learner `GET /api/v1/exams/` now also lists course exams offered on their own. A request (`POST /access-requests/`) for such an exam answers 409 `already_has_access` when the learner is enrolled in its course.
 
+## Exam offer prices and bulk assigning (2026-11-22)
+
+- Exams have an optional offer: `sale_price` (above 0, below `price`) and `sale_ends_at` (null: until removed). Public catalog rows and the learner exam payloads add `current_price` (the offer while it runs, else `price`) and `sale_ends_at`; `price` stays the actual price. `ordering=price_low|price_high` sorts by `current_price`.
+- `GET /api/v1/checkout/item/` adds `list_price`; `price` is now what the learner pays today. Access requests snapshot that current price.
+- Admin exam payloads add `sale_price` and `sale_ends_at`. Only `assessments.manage_exams` may change them; 400 when the offer is not below the price, the exam has no price of its own, or a new end date is in the past. Clearing `sale_price` clears the end date.
+- `GET /api/v1/admin/access/people/?search=` (`learning.manage_enrollments`): up to 20 active accounts matching name, email or phone, `[{id, full_name, email}]`; fewer than 2 characters returns `[]`.
+- `POST /api/v1/admin/access/assign/` (`learning.manage_enrollments`): `{users: [ids] (1-100, active), courses: [ids] (not draft), exams: [ids] (published)}`, at least one course or exam. All or nothing in one transaction; each grant uses the same service and audit entry as a single grant. Answers `{added, already_had, results: [{user, user_name, kind, item, title, added}]}`. Running it twice adds nothing.
+- `GET /admin/access/options/` and `POST /admin/users/{id}/exam-access/` now cover every published exam, including course-only ones; an active grant lets the learner take a course exam without the course.
+
 ## Live classes (M6)
 
 ### Learner

@@ -298,3 +298,7 @@ Short records of choices that are expensive to reverse. Newest last.
 **Why:** Students preparing for Loksewa, entrance or licence exams want practice and formal tests without buying a course. Reusing exams avoids duplicating question sets, and keeping the decision in `attempts.eligibility` means the catalog never grants access by itself.
 **Consequences:** Course exams that are not offered on their own still appear in the catalog, pointing to the course. Instructors can't put a price on their exams; a manager does that.
 
+## ADR-058: Exam offer prices, and staff grants open any exam
+**Decision:** Exams get an offer price and end date like courses (`current_price()`), strictly between 0 and the actual price. Staff can grant any published exam, course-only ones included, and a new Assign access page gives many people many courses and exams in one transaction through the existing grant services.
+**Why:** Admins wanted to run discounts on exams and to add courses and exams to people directly (for example a class paid offline) without one form per person and item. Keeping the offer above 0 means "free" never depends on time. `attempts.eligibility` now separates "free" from "granted", so a grant is the one rule that opens a course exam without the course.
+**Consequences:** A course exam assigned to someone shows up in their exam list. Revoking the grant closes it again. The people lookup on the assign page shows only name and email of active accounts to staff who can already grant access by email.

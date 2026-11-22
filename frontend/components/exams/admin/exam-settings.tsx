@@ -27,6 +27,8 @@ type Draft = {
   category: number | null;
   sold_separately: boolean;
   price: string;
+  sale_price: string; // "" = no offer
+  sale_ends_at: string;
   kind: ExamKind;
   duration_minutes: string;
   opens_at: string; // datetime-local in the browser's zone
@@ -70,6 +72,8 @@ function toDraft(e: AdminExam): Draft {
     category: e.category,
     sold_separately: e.sold_separately,
     price: e.price,
+    sale_price: e.sale_price ?? "",
+    sale_ends_at: local(e.sale_ends_at),
     kind: e.kind,
     duration_minutes: String(e.duration_minutes),
     opens_at: local(e.opens_at),
@@ -91,6 +95,9 @@ function toDraft(e: AdminExam): Draft {
 /** A course exam has its own price only when it is also offered without the course. */
 const ownPrice = (d: Pick<Draft, "course" | "sold_separately">) => d.course === null || d.sold_separately;
 
+/** An offer only exists on an exam with a price of its own, above 0. */
+const hasOffer = (d: Draft) => ownPrice(d) && Number(d.price) > 0 && d.sale_price.trim() !== "";
+
 function payload(d: Draft): Record<string, unknown> {
   return {
     title: d.title,
@@ -101,6 +108,8 @@ function payload(d: Draft): Record<string, unknown> {
     category: d.category,
     sold_separately: d.course !== null && d.sold_separately,
     price: ownPrice(d) ? moneyOrRaw(d.price) : "0.00",
+    sale_price: hasOffer(d) ? moneyOrRaw(d.sale_price) : null,
+    sale_ends_at: hasOffer(d) ? isoOrNull(d.sale_ends_at) : null,
     kind: d.kind,
     duration_minutes: intOrNull(d.duration_minutes),
     opens_at: isoOrNull(d.opens_at),
@@ -274,6 +283,34 @@ export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; mana
                 onChange={(e) => update({ price: e.target.value })}
               />
             </Field>
+            {ownPrice(draft) && Number(draft.price) > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Offer price (NPR)"
+                  htmlFor="exam-sale-price"
+                  error={errors.sale_price}
+                  hint={manager ? "Optional. Below the price above; shown with the price struck through. Leave empty for no offer." : "Only exam managers can change the offer."}
+                >
+                  <Input
+                    id="exam-sale-price"
+                    inputMode="decimal"
+                    placeholder="No offer"
+                    value={draft.sale_price}
+                    disabled={!canEdit || !manager}
+                    onChange={(e) => update({ sale_price: e.target.value })}
+                  />
+                </Field>
+                <Field label="Offer ends" htmlFor="exam-sale-ends" error={errors.sale_ends_at} hint="Optional. Without a date the offer runs until you remove it.">
+                  <Input
+                    id="exam-sale-ends"
+                    type="datetime-local"
+                    value={draft.sale_ends_at}
+                    disabled={!canEdit || !manager || draft.sale_price.trim() === ""}
+                    onChange={(e) => update({ sale_ends_at: e.target.value })}
+                  />
+                </Field>
+              </div>
+            )}
             <Field label="Type" htmlFor="exam-kind" error={errors.kind}>
               <Select id="exam-kind" value={draft.kind} disabled={locked("kind")} onChange={(e) => update({ kind: e.target.value as ExamKind })}>
                 {Object.entries(EXAM_KIND_LABEL).map(([value, label]) => (

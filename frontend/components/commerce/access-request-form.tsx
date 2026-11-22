@@ -81,7 +81,15 @@ export function AccessRequestForm({ item, defaultName }: { item: CheckoutItem; d
         <p className="font-medium text-navy">{item.title}</p>
         <p className="flex items-baseline justify-between border-t border-line pt-3 text-sm">
           <span className="text-muted">Price</span>
-          <span className="text-lg font-semibold text-navy">{formatPrice(item.price)}</span>
+          <span className="flex items-baseline gap-2">
+            {item.list_price !== item.price && (
+              <span className="text-muted line-through">
+                <span className="sr-only">Regular price </span>
+                {formatPrice(item.list_price)}
+              </span>
+            )}
+            <span className="text-lg font-semibold text-navy">{formatPrice(item.price)}</span>
+          </span>
         </p>
       </CardBody>
     </Card>

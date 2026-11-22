@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (hasPerm(user, "catalog.manage_catalog"))
     learning.push({ href: "/admin/catalog/categories", label: "Course categories", icon: "categories" });
   if (canOpenEnrollments(user)) learning.push({ href: "/admin/learning/enrollments", label: "Enrollments", icon: "enrollments" });
+  if (hasPerm(user, "learning.manage_enrollments")) learning.push({ href: "/admin/access", label: "Assign access", icon: "users" });
   if (canOpenAssignments(user)) learning.push({ href: "/admin/learning/assignments", label: "Assignments", icon: "assignments" });
   if (canOpenLiveClasses(user)) learning.push({ href: "/admin/live-classes", label: "Live classes", icon: "live" });
   if (canOpenCertificates(user)) learning.push({ href: "/admin/certificates", label: "Certificates", icon: "certificates" });
