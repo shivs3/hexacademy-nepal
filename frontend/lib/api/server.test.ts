@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn(), headers: vi.fn() }));
 
-import { forwardedHeaders } from "./server";
+import { apiUrl, forwardedHeaders } from "./server";
 
 describe("forwardedHeaders", () => {
   it("passes on the client address Nginx set and the request id", () => {
@@ -21,5 +21,16 @@ describe("forwardedHeaders", () => {
   it("drops malformed values and sends nothing when absent", () => {
     expect(forwardedHeaders(new Headers({ "x-forwarded-for": "unknown; drop table", "x-request-id": "x".repeat(200), "x-forwarded-proto": "gopher" }))).toEqual({});
     expect(forwardedHeaders(new Headers())).toEqual({});
+  });
+});
+
+describe("apiUrl", () => {
+  it("adds the trailing slash to the path, not to a query", () => {
+    expect(apiUrl("/checkout/item/?course=nrb-it")).toBe("http://127.0.0.1:8000/api/v1/checkout/item/?course=nrb-it");
+    expect(apiUrl("/checkout/item?course=nrb-it")).toBe("http://127.0.0.1:8000/api/v1/checkout/item/?course=nrb-it");
+  });
+
+  it("encodes query values and skips empty ones", () => {
+    expect(apiUrl("/courses", { search: "a b", page: 2, level: "" })).toBe("http://127.0.0.1:8000/api/v1/courses/?search=a+b&page=2");
   });
 });

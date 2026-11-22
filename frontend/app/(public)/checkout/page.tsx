@@ -26,8 +26,7 @@ export default async function CheckoutPage({ searchParams }: Props) {
   if (!course && !exam) notFound();
   const user = await requireUser(course ? checkoutHref(course) : examCheckoutHref(exam));
 
-  const query = course ? `course=${encodeURIComponent(course)}` : `exam=${encodeURIComponent(exam)}`;
-  const item = await serverGetOrNull<CheckoutItem>(`/checkout/item/?${query}`);
+  const item = await serverGetOrNull<CheckoutItem>("/checkout/item/", course ? { course } : { exam });
   if (!item) notFound();
   const slug = encodeURIComponent(item.slug);
   let back: { href: string; label: string };

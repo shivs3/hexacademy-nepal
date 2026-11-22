@@ -8,10 +8,12 @@ const INTERNAL_API_URL = process.env.INTERNAL_API_URL ?? "http://127.0.0.1:8000"
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
-function url(path: string, query?: Query): string {
-  const clean = path.startsWith("/") ? path : `/${path}`;
+export function apiUrl(path: string, query?: Query): string {
+  // A query written into the path goes after the trailing slash, never inside it.
+  const [rawPath, inline = ""] = path.split("?", 2);
+  const clean = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
   const withSlash = clean.endsWith("/") ? clean : `${clean}/`;
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(inline);
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
   }
@@ -48,7 +50,7 @@ export function forwardedHeaders(incoming: Headers): Record<string, string> {
  */
 export async function serverGet<T>(path: string, query?: Query): Promise<T> {
   const cookieHeader = (await cookies()).toString();
-  const response = await fetch(url(path, query), {
+  const response = await fetch(apiUrl(path, query), {
     headers: {
       Accept: "application/json",
       ...forwardedHeaders(await headers()),
