@@ -25,6 +25,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const assessments: NavItem[] = [];
   if (canOpenExams(user)) assessments.push({ href: "/admin/assessments/exams", label: "Exams", icon: "exams" });
+  if (hasPerm(user, "assessments.manage_exams"))
+    assessments.push({ href: "/admin/assessments/categories", label: "Exam categories", icon: "categories" });
   if (canOpenBank(user)) assessments.push({ href: "/admin/assessments/questions", label: "Question bank", icon: "bank" });
   if (hasPerm(user, "assessments.manage_question_bank"))
     assessments.push({ href: "/admin/assessments/subjects", label: "Subjects & topics", icon: "categories" });

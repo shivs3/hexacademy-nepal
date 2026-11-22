@@ -126,7 +126,7 @@ def test_invalid_requests_are_refused(case, client_for, paid_course, make_course
         exam = Exam.objects.create(
             title="Quiz", slug="quiz", duration_minutes=10, status="published", course=paid_course()
         )
-        body, code = {"exam": exam.slug}, 404
+        body, code = {"exam": exam.slug}, 404  # only offered with its course
     else:
         body, code = {"course": paid_course().slug, "exam": paid_exam.slug}, 400
     send(learner, expect=code, **body)

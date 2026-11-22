@@ -129,6 +129,8 @@ export function ExamsList({ manager, canCreate }: { manager: boolean; canCreate:
                       </Link>
                       <p className="text-xs text-muted">
                         {EXAM_KIND_LABEL[exam.kind]} · {exam.duration_minutes} min · {exam.course_title || "No course"}
+                        {exam.sold_separately ? " · also on its own" : ""}
+                        {exam.category_name ? ` · ${exam.category_name}` : ""}
                       </p>
                     </td>
                     <td className="px-4 py-3">

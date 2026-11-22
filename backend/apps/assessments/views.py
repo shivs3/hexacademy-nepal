@@ -16,7 +16,7 @@ from rest_framework.views import APIView
 from apps.learning.models import Enrollment
 
 from . import attempts, results, services
-from .models import AttemptQuestion, Exam, ExamAccess, ExamAttempt
+from .models import OFFERED_ON_ITS_OWN, AttemptQuestion, Exam, ExamAccess, ExamAttempt
 from .serializers import (
     AdvanceInputSerializer,
     AnswerInputSerializer,
@@ -35,7 +35,7 @@ def learner_exams(user):
     attempted = ExamAttempt.objects.filter(user=user).values("exam_id")
     return (
         Exam.objects.exclude(status=Exam.Status.DRAFT)
-        .filter(Q(course__isnull=True) | Q(course_id__in=enrolled) | Q(pk__in=attempted))
+        .filter(OFFERED_ON_ITS_OWN | Q(course_id__in=enrolled) | Q(pk__in=attempted))
         .select_related("course")
     )
 

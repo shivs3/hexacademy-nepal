@@ -1,4 +1,17 @@
-import type { Availability, AttemptStatus, Difficulty, ExamKind, ExamStatus, QuestionKind, QuestionStatus, ResultRelease } from "@/types/assessments";
+import { examCheckoutHref } from "@/lib/commerce";
+import type {
+  Availability,
+  AttemptStatus,
+  Difficulty,
+  ExamKind,
+  ExamOffer,
+  ExamStatus,
+  LearnerExam,
+  PublicExam,
+  QuestionKind,
+  QuestionStatus,
+  ResultRelease,
+} from "@/types/assessments";
 
 export const KIND_LABEL: Record<QuestionKind, string> = {
   single: "Single choice",
@@ -110,4 +123,48 @@ export function attemptsLeftText(maxAttempts: number | null, used: number): stri
   if (maxAttempts == null) return "Unlimited attempts";
   const left = Math.max(0, maxAttempts - used);
   return `${left} of ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"} left`;
+}
+
+export const EXAM_OFFER_LABEL: Record<ExamOffer, string> = {
+  free: "Free",
+  paid: "Paid",
+  course: "With a course",
+};
+
+export type ExamAction = { label: string; href: string; note?: string; secondary?: { label: string; href: string } };
+
+function signIn(next: string): string {
+  return `/login?next=${encodeURIComponent(next)}`;
+}
+
+/**
+ * The one call to action on a public exam page. `learner` is the signed-in
+ * learner's view of the exam (null when signed out or not offered to them).
+ * The backend still decides whether an attempt may start.
+ */
+export function publicExamAction(exam: PublicExam, signedIn: boolean, learner: LearnerExam | null): ExamAction {
+  const page = `/dashboard/exams/${encodeURIComponent(exam.slug)}`;
+  const course = exam.course ? { label: exam.course.title, href: `/courses/${encodeURIComponent(exam.course.slug)}` } : undefined;
+  if (exam.offer === "course" && !learner) {
+    return { label: "View the course", href: course?.href ?? "/courses", note: "This exam is included with its course. Enroll in the course to take it." };
+  }
+  if (!signedIn) {
+    if (exam.offer === "paid") {
+      return { label: "Request access", href: signIn(examCheckoutHref(exam.slug)), note: "Sign in, then send a request. We add the exam to your account once your payment is confirmed.", secondary: course };
+    }
+    return { label: "Sign in to start", href: signIn(page), note: "Free to take with a Hexacademy account." };
+  }
+  if (!learner) return { label: "Open in your dashboard", href: page };
+  switch (learner.availability) {
+    case "available":
+      return { label: "Start exam", href: page, note: "You'll see the rules before the timer starts." };
+    case "in_progress":
+      return { label: "Resume exam", href: learner.open_attempt_id ? `/exam/${learner.open_attempt_id}` : page };
+    case "not_purchased":
+      return { label: "Request access", href: examCheckoutHref(exam.slug), note: "We add the exam to your account once your payment is confirmed.", secondary: course };
+    case "not_enrolled":
+      return { label: "View the course", href: course?.href ?? "/courses", note: AVAILABILITY_TEXT.not_enrolled + "." };
+    default:
+      return { label: "Open in your dashboard", href: page, note: AVAILABILITY_TEXT[learner.availability] + "." };
+  }
 }

@@ -11,6 +11,51 @@ export type ResultRelease = "immediate" | "after_close" | "manual";
 export type AttemptStatus = "in_progress" | "submitted" | "expired";
 export type Availability = "available" | "in_progress" | "not_open" | "closed" | "not_enrolled" | "not_purchased" | "email_unverified" | "no_attempts_left";
 
+// --- Public catalog ----------------------------------------------------------
+
+/** free / paid: taken on its own; course: only with its course. */
+export type ExamOffer = "free" | "paid" | "course";
+
+export type PublicExam = {
+  slug: string;
+  title: string;
+  summary: string;
+  kind: ExamKind;
+  kind_label: string;
+  category: { name: string; slug: string } | null;
+  course: { title: string; slug: string } | null;
+  offer: ExamOffer;
+  price: string;
+  is_free: boolean;
+  duration_minutes: number;
+  question_total: number;
+  total_marks: string;
+  opens_at: string | null;
+  closes_at: string | null;
+  max_attempts: number | null;
+  negative_marking: boolean;
+};
+
+export type PublicExamDetail = PublicExam & {
+  instructions: string;
+  pass_marks: string | null;
+  allow_revisit: boolean;
+  result_release_label: string;
+  updated_at: string;
+};
+
+export type PublicExamCategory = { name: string; slug: string; description: string; exam_count: number };
+
+export type AdminExamCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  position: number;
+  is_active: boolean;
+  exam_count: number;
+};
+
 // --- Learner -----------------------------------------------------------------
 
 export type CourseRef = { id: number; title: string; slug: string };
@@ -234,10 +279,15 @@ export type AdminExamSummary = {
   updated_at: string;
   /** Decimal string; 0 means free. */
   price: string;
+  /** A course exam that can also be taken without the course. */
+  sold_separately: boolean;
+  category: number | null;
+  category_name: string;
 };
 
 export type AdminExam = AdminExamSummary & {
   instructions: string;
+  summary: string;
   question_count: number | null;
   shuffle_questions: boolean;
   shuffle_options: boolean;

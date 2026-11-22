@@ -294,17 +294,23 @@ PREVIOUS_SECTIONS = {
 MENUS = {
     "header": (
         "Main navigation",
-        [("Courses", "/courses"), ("Blog", "/blog"), ("About", "about"), ("Contact", "contact")],
+        [("Courses", "/courses"), ("Exams", "/exams"), ("Blog", "/blog"), ("About", "about"), ("Contact", "contact")],
     ),
     "footer": (
         "Footer",
-        [("Courses", "/courses"), ("About", "about"), ("Blog", "/blog"), ("Contact", "contact")],
+        [("Courses", "/courses"), ("Exams", "/exams"), ("About", "about"), ("Blog", "/blog"), ("Contact", "contact")],
     ),
     "legal": ("Legal", [("Terms of service", "terms"), ("Privacy policy", "privacy")]),
 }
 PREVIOUS_MENUS = {
-    "header": [[("About", "about"), ("Blog", "/blog"), ("Contact", "contact")]],
-    "footer": [[("About", "about"), ("Blog", "/blog"), ("Contact", "contact")]],
+    "header": [
+        [("About", "about"), ("Blog", "/blog"), ("Contact", "contact")],
+        [("Courses", "/courses"), ("Blog", "/blog"), ("About", "about"), ("Contact", "contact")],
+    ],
+    "footer": [
+        [("About", "about"), ("Blog", "/blog"), ("Contact", "contact")],
+        [("Courses", "/courses"), ("About", "about"), ("Blog", "/blog"), ("Contact", "contact")],
+    ],
 }
 
 BLOG_CATEGORIES = [

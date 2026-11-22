@@ -33,7 +33,7 @@ from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.assessments import access as exam_access
-from apps.assessments.models import Exam, ExamAccess
+from apps.assessments.models import OFFERED_ON_ITS_OWN, Exam, ExamAccess
 from apps.catalog.models import Course
 from apps.cms import sanitize
 from apps.learning.models import Enrollment
@@ -80,7 +80,7 @@ class CheckoutItemView(APIView):
             pending = pending.filter(course=course)
         elif exam_slug:
             exam = get_object_or_404(
-                Exam.objects.filter(status=Exam.Status.PUBLISHED, course__isnull=True), slug=exam_slug
+                Exam.objects.filter(OFFERED_ON_ITS_OWN, status=Exam.Status.PUBLISHED), slug=exam_slug
             )
             item = {"kind": "exam", "slug": exam.slug, "title": exam.title, "price": exam.price}
             pending = pending.filter(exam=exam)
@@ -224,7 +224,7 @@ class AdminAccessOptionsView(APIView):
     @extend_schema(responses=AccessOptionsSerializer)
     def get(self, request):
         courses = Course.objects.exclude(status=Course.Status.DRAFT).order_by("title")
-        exams = Exam.objects.filter(status=Exam.Status.PUBLISHED, course__isnull=True).order_by("title")
+        exams = Exam.objects.filter(OFFERED_ON_ITS_OWN, status=Exam.Status.PUBLISHED).order_by("title")
         batches = Batch.objects.filter(status=Batch.Status.ACTIVE).select_related("course").order_by("name")
         payload = {
             "courses": [

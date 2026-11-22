@@ -74,9 +74,21 @@ class LearnerExamSerializer(serializers.ModelSerializer):
             "price", "is_free", "has_access",
         ]  # fmt: skip
 
+    def _enrolled(self, obj) -> bool:
+        if not obj.course_id:
+            return False
+        ids = self.context.get("enrolled_course_ids")
+        if ids is not None:
+            return obj.course_id in ids
+        cache = self.context.setdefault("_enrolled", {})
+        if obj.course_id not in cache:
+            cache[obj.course_id] = attempts.active_enrollment(self.context["request"].user, obj.course) is not None
+        return cache[obj.course_id]
+
     def get_has_access(self, obj) -> bool:
-        """Whether the learner may take this exam as far as payment goes."""
-        if obj.course_id or obj.is_free:
+        """Whether the learner may take this exam as far as payment goes:
+        free, included with their course, or granted by staff."""
+        if obj.is_free or self._enrolled(obj):
             return True
         ids = self.context.get("accessible_exam_ids")
         if ids is not None:
@@ -115,11 +127,10 @@ class LearnerExamSerializer(serializers.ModelSerializer):
     def get_availability(self, obj):
         if self.get_open_attempt_id(obj):
             return "in_progress"
-        enrolled_ids = self.context.get("enrolled_course_ids")
         allowed, reason = attempts.eligibility(
             self.context["request"].user,
             obj,
-            enrolled=None if enrolled_ids is None else obj.course_id in enrolled_ids,
+            enrolled=self._enrolled(obj),
             used=len(obj.my_attempts) if hasattr(obj, "my_attempts") else None,
             has_access=self.get_has_access(obj),
         )

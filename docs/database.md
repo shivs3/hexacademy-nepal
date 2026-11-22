@@ -163,6 +163,12 @@ Custom permissions: `commerce.view_orders`, `manage_orders`, `manage_refunds`, `
 - `commerce_accessrequest`: `number` unique, `user` (CASCADE), `kind` course/exam, `course` / `exam` (SET_NULL), snapshots `item_title` and `price` (`CHECK` ≥ 0), `full_name`, `phone`, `payment_reference`, `message` (plain text), `status` pending/approved/rejected/cancelled (indexed), `staff_note`, `handled_by` (SET_NULL), `handled_at`. **Partial unique `(user, course)` and `(user, exam)` where pending**, so a learner has at most one open request per item.
 - `commerce_paymentsettings` gains `request_notify_email` (default hexacademynepal@gmail.com) and `request_instructions` (sanitised rich text: how to pay).
 
+## Exam categories and exam-only enrollment (2026-11-22)
+
+- `assessments_examcategory`: `name`, `slug` unique, `description` (500), `position`, `is_active`. Ordered by position, name.
+- `assessments_exam` gains `category` (SET_NULL, deleting a category keeps its exams), `summary` (300, plain text) and `sold_separately` (default false).
+- The price check is now `assessments_exam_paid_only_on_its_own`: price = 0, or no course, or `sold_separately`. A standalone exam is always saved with `sold_separately` false.
+
 ## Live classes, assignments, notifications and certificates (M6)
 
 ```

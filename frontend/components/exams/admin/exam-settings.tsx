@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/feedback";
 import { Field } from "@/components/ui/field";
-import { Checkbox, Input, Label, Select } from "@/components/ui/input";
+import { Checkbox, Input, Label, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { useSaveShortcut, useUnsavedWarning } from "@/hooks/use-unsaved-warning";
@@ -16,13 +16,16 @@ import { api } from "@/lib/api/client";
 import { errorMessage, isApiError } from "@/lib/api/errors";
 import { EXAM_KIND_LABEL, RELEASE_LABEL } from "@/lib/assessments";
 import { toLocalInput } from "@/lib/utils";
-import type { AdminExam, CourseOption, ExamKind, ResultRelease } from "@/types/assessments";
+import type { AdminExam, AdminExamCategory, CourseOption, ExamKind, ResultRelease } from "@/types/assessments";
 
 type Draft = {
   title: string;
   slug: string;
   instructions: string;
+  summary: string;
   course: number | null;
+  category: number | null;
+  sold_separately: boolean;
   price: string;
   kind: ExamKind;
   duration_minutes: string;
@@ -62,7 +65,10 @@ function toDraft(e: AdminExam): Draft {
     title: e.title,
     slug: e.slug,
     instructions: e.instructions,
+    summary: e.summary,
     course: e.course,
+    category: e.category,
+    sold_separately: e.sold_separately,
     price: e.price,
     kind: e.kind,
     duration_minutes: String(e.duration_minutes),
@@ -82,13 +88,19 @@ function toDraft(e: AdminExam): Draft {
   };
 }
 
+/** A course exam has its own price only when it is also offered without the course. */
+const ownPrice = (d: Pick<Draft, "course" | "sold_separately">) => d.course === null || d.sold_separately;
+
 function payload(d: Draft): Record<string, unknown> {
   return {
     title: d.title,
     slug: d.slug,
     instructions: d.instructions,
+    summary: d.summary,
     course: d.course,
-    price: d.course ? "0.00" : moneyOrRaw(d.price),
+    category: d.category,
+    sold_separately: d.course !== null && d.sold_separately,
+    price: ownPrice(d) ? moneyOrRaw(d.price) : "0.00",
     kind: d.kind,
     duration_minutes: intOrNull(d.duration_minutes),
     opens_at: isoOrNull(d.opens_at),
@@ -116,6 +128,7 @@ function changes(d: Draft, exam: AdminExam): Record<string, unknown> {
 export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; manager: boolean; onSaved: (exam: AdminExam) => void }) {
   const toast = useToast();
   const courses = useApiResource<CourseOption[]>("/admin/assessments/course-options/");
+  const categories = useApiResource<AdminExamCategory[]>("/admin/assessments/exam-categories/");
   const [draft, setDraft] = useState<Draft>(() => toDraft(exam));
   const [syncedFrom, setSyncedFrom] = useState(exam);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -177,8 +190,23 @@ export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; mana
             <Field label="Title" htmlFor="exam-title" required error={errors.title}>
               <Input id="exam-title" value={draft.title} disabled={!canEdit} onChange={(e) => update({ title: e.target.value })} />
             </Field>
-            <Field label="Address" htmlFor="exam-slug" required error={errors.slug} hint={`Learners open it at /dashboard/exams/${draft.slug || "…"}`}>
+            <Field label="Address" htmlFor="exam-slug" required error={errors.slug} hint={`Public page: /exams/${draft.slug || "…"}`}>
               <Input id="exam-slug" value={draft.slug} disabled={!canEdit} onChange={(e) => update({ slug: e.target.value })} />
+            </Field>
+            <Field label="Category" htmlFor="exam-category" error={errors.category} hint={manager ? "Groups the exam on the public Exams page. Manage the list under Exam categories." : "Groups the exam on the public Exams page."}>
+              <Select id="exam-category" value={draft.category ?? ""} disabled={!canEdit} onChange={(e) => update({ category: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">No category</option>
+                {categories.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.is_active ? "" : " (hidden)"}
+                  </option>
+                ))}
+                {exam.category && !categories.data?.some((c) => c.id === exam.category) && <option value={exam.category}>{exam.category_name}</option>}
+              </Select>
+            </Field>
+            <Field label="Summary" htmlFor="exam-summary" error={errors.summary} hint="One or two plain sentences for the exam card on the public Exams page.">
+              <Textarea id="exam-summary" rows={2} maxLength={300} value={draft.summary} disabled={!canEdit} onChange={(e) => update({ summary: e.target.value })} />
             </Field>
             <div className="sm:col-span-2">
               <Field label="Instructions" htmlFor="exam-instructions" required error={errors.instructions} hint="Shown before the learner starts. Say what is allowed and how marking works.">
@@ -197,7 +225,7 @@ export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; mana
             <CardTitle>Access and timing</CardTitle>
           </CardHeader>
           <CardBody className="flex flex-col gap-4">
-            <Field label="Course" htmlFor="exam-course" error={errors.course} hint="Only learners enrolled in the course can take its exams.">
+            <Field label="Course" htmlFor="exam-course" error={errors.course} hint="Learners enrolled in the course take its exams for free.">
               <Select id="exam-course" value={draft.course ?? ""} disabled={locked("course")} onChange={(e) => update({ course: e.target.value ? Number(e.target.value) : null })}>
                 {(manager || draft.course === null) && <option value="">{manager ? "No course (all signed-in learners)" : "Choose a course"}</option>}
                 {courses.data?.map((c) => (
@@ -209,22 +237,40 @@ export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; mana
                 {exam.course && !courses.data?.some((c) => c.id === exam.course) && <option value={exam.course}>{exam.course_title}</option>}
               </Select>
             </Field>
+            {draft.course !== null && (
+              <Toggle
+                id="exam-sold-separately"
+                label="Offer without the course"
+                hint={
+                  manager
+                    ? "Learners who aren't enrolled can also take this exam on its own, for free or at the price below. Enrolled learners still get it with the course."
+                    : "Only exam managers can change how an exam is offered."
+                }
+                checked={draft.sold_separately}
+                disabled={!canEdit || !manager}
+                onChange={(v) => update({ sold_separately: v })}
+              />
+            )}
             <Field
               label="Price (NPR)"
               htmlFor="exam-price"
               error={errors.price}
               hint={
-                draft.course
-                  ? "Course exams come with the course, so they have no price of their own."
-                  : "0 makes the exam free for every signed-in learner. Above 0, learners send an access request and staff approve it."
+                !ownPrice(draft)
+                  ? "Course exams come with the course. Offer it without the course to give it a price of its own."
+                  : !manager
+                    ? "Only exam managers can change the price."
+                    : draft.course
+                      ? "What learners who aren't enrolled pay. 0 makes it free for every signed-in learner."
+                      : "0 makes the exam free for every signed-in learner. Above 0, learners send an access request and staff approve it."
               }
             >
               <Input
                 id="exam-price"
                 inputMode="decimal"
                 className="sm:w-40"
-                value={draft.course ? "0" : draft.price}
-                disabled={!canEdit || draft.course !== null}
+                value={ownPrice(draft) ? draft.price : "0"}
+                disabled={!canEdit || !manager || !ownPrice(draft)}
                 onChange={(e) => update({ price: e.target.value })}
               />
             </Field>

@@ -293,3 +293,8 @@ Short records of choices that are expensive to reverse. Newest last.
 **Why:** The owner takes payment by eSewa, bank or cash and wants to decide who gets access. A form plus manual approval needs no merchant account and never treats a learner's claim as proof of payment.
 **Consequences:** Access is only as fast as staff review. The order, coupon and gateway code from M5 stays in place but is no longer linked from checkout; re-linking it is the path back to automatic payments. The notification email depends on SMTP being configured; the request is stored and shown in the admin either way.
 
+## ADR-057: A public Exams section, and course exams offered on their own
+**Decision:** `/exams` lists every published exam to visitors. A course exam can be flagged "Offer without the course" (`sold_separately`): learners who aren't enrolled take it free, or at the exam's own price through the request form; enrolled learners keep getting it with the course. Exams are grouped by admin-managed `ExamCategory`. Only exam managers set price or the flag.
+**Why:** Students preparing for Loksewa, entrance or licence exams want practice and formal tests without buying a course. Reusing exams avoids duplicating question sets, and keeping the decision in `attempts.eligibility` means the catalog never grants access by itself.
+**Consequences:** Course exams that are not offered on their own still appear in the catalog, pointing to the course. Instructors can't put a price on their exams; a manager does that.
+

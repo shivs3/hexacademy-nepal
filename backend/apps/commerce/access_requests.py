@@ -47,10 +47,14 @@ def _check_course(user, course: Course) -> None:
 
 
 def _check_exam(user, exam: Exam) -> None:
-    if exam.status != Exam.Status.PUBLISHED or exam.course_id:
+    if exam.status != Exam.Status.PUBLISHED or not exam.offered_on_its_own:
         raise DomainError("This exam is not available.", code="not_available", status_code=404)
     if exam.is_free:
         raise DomainError("This exam is free. Start it from the exam page.", code="free_item")
+    if exam.course_id:
+        enrollment = Enrollment.objects.filter(user=user, course_id=exam.course_id).first()
+        if enrollment and enrollment.is_active:
+            raise ConflictError("This exam is included with your course.", code="already_has_access")
     if ExamAccess.objects.filter(user=user, exam=exam, status=ExamAccess.Status.ACTIVE).exists():
         raise ConflictError("You already have access to this exam.", code="already_has_access")
 

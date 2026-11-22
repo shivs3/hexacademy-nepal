@@ -16,7 +16,17 @@ from apps.cms.media import media_payload
 from apps.cms.serializers import MediaRefSerializer
 
 from . import policies, results, services
-from .models import Exam, ExamAttempt, ExamQuestion, Question, QuestionOption, QuestionVersion, Subject, Topic
+from .models import (
+    Exam,
+    ExamAttempt,
+    ExamCategory,
+    ExamQuestion,
+    Question,
+    QuestionOption,
+    QuestionVersion,
+    Subject,
+    Topic,
+)
 
 MAX_TAGS = 20
 MARK_FIELD = {"max_digits": 7, "decimal_places": 2}
@@ -80,6 +90,23 @@ class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
         fields = ["id", "name", "slug", "description", "position", "topics", "question_count"]
+
+    def validate_name(self, value):
+        return _plain_required(value)
+
+    def validate_slug(self, value):
+        return _slug(value)
+
+    def validate_description(self, value):
+        return " ".join(sanitize.clean_plain_text(value).split())
+
+
+class ExamCategorySerializer(serializers.ModelSerializer):
+    exam_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = ExamCategory
+        fields = ["id", "name", "slug", "description", "position", "is_active", "exam_count"]
 
     def validate_name(self, value):
         return _plain_required(value)
@@ -249,6 +276,7 @@ class ExamQuestionListInputSerializer(serializers.Serializer):
 
 class AdminExamListSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source="course.title", read_only=True, default="")
+    category_name = serializers.CharField(source="category.name", read_only=True, default="")
     question_total = serializers.IntegerField(read_only=True, default=0)
     attempt_total = serializers.IntegerField(read_only=True, default=0)
 
@@ -257,12 +285,13 @@ class AdminExamListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "slug", "course", "course_title", "kind", "status", "duration_minutes", "opens_at",
             "closes_at", "question_total", "attempt_total", "result_release", "results_published_at", "updated_at",
-            "price",
+            "price", "sold_separately", "category", "category_name",
         ]  # fmt: skip
 
 
 class AdminExamSerializer(AdminExamListSerializer):
     course = serializers.PrimaryKeyRelatedField(queryset=Course.objects.all(), allow_null=True, required=False)
+    category = serializers.PrimaryKeyRelatedField(queryset=ExamCategory.objects.all(), allow_null=True, required=False)
     pass_marks = serializers.DecimalField(**MARK_FIELD, min_value=Decimal("0"), allow_null=True, required=False)
     price = serializers.DecimalField(
         max_digits=10, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("1000000"), required=False
@@ -276,7 +305,7 @@ class AdminExamSerializer(AdminExamListSerializer):
     class Meta(AdminExamListSerializer.Meta):
         fields = [
             *AdminExamListSerializer.Meta.fields,
-            "instructions", "question_count", "shuffle_questions", "shuffle_options", "negative_marking",
+            "summary", "instructions", "question_count", "shuffle_questions", "shuffle_options", "negative_marking",
             "pass_marks", "max_attempts", "allow_revisit", "show_answers", "show_explanations", "ranking_enabled",
             "published_at", "total_marks", "drawn_questions", "abilities", "publish_problems", "results_released",
             "created_at",
@@ -313,6 +342,9 @@ class AdminExamSerializer(AdminExamListSerializer):
 
     def validate_slug(self, value):
         return _slug(value)
+
+    def validate_summary(self, value):
+        return " ".join(sanitize.clean_plain_text(value).split())
 
     def validate_instructions(self, value):
         if len(value) > 50_000:
@@ -352,9 +384,19 @@ class AdminExamSerializer(AdminExamListSerializer):
             raise serializers.ValidationError({"closes_at": ["The exam must close after it opens."]})
         if get("question_count") == 0:
             raise serializers.ValidationError({"question_count": ["Draw at least one question, or leave it empty."]})
-        if (get("price") or 0) > 0 and get("course"):
+        # Pricing is a business decision: only exam managers set it, not course instructors.
+        user = self.context["request"].user
+        for field in ("price", "sold_separately"):
+            changed = field in attrs and attrs[field] != (
+                getattr(instance, field) if instance else Exam._meta.get_field(field).default
+            )
+            if changed and not policies.can_manage_exams(user):
+                raise serializers.ValidationError({field: ["Only exam managers can change how an exam is sold."]})
+        if not get("course"):
+            attrs["sold_separately"] = False
+        if (get("price") or 0) > 0 and get("course") and not get("sold_separately"):
             raise serializers.ValidationError(
-                {"price": ["A course exam is included with the course. Remove the course or set the price to 0."]}
+                {"price": ["A course exam is included with the course. Offer it without the course to set a price."]}
             )
         if get("max_attempts") == 0:
             raise serializers.ValidationError({"max_attempts": ["Allow at least one attempt, or leave it empty."]})

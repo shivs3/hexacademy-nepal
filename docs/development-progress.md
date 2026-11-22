@@ -504,6 +504,14 @@ Update this file at the end of every milestone. Only record what was actually ex
 - Verified locally: 494 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 145 unit tests and the production build.
 - **Blocker unchanged:** email to the notify address needs SMTP (Zoho details awaited). Until then requests only appear in the admin.
 
+## Exams section and exam-only enrollment (2026-11-22)
+
+- Public `/exams` lists every published exam (practice and formal, free and paid, standalone and course exams), with category pills, type, access and sort filters, search and pages. `/exams/{slug}` shows the rules and one action: sign in, Start/Resume, Request access, or View the course. Both pages are open to visitors and in the sitemap; "Exams" is in the seeded header and footer menus.
+- Course exams can be offered without the course (`Exam.sold_separately`): non-enrolled learners take them free or at the exam's own price through the request form; enrolled learners still get them with the course (ADR-057).
+- Admin: Assessments → Exam categories (managers), and exam settings gain category, summary and "Offer without the course". Only exam managers change price or how an exam is offered.
+- New: `apps/assessments/public.py`, `ExamCategory`, migration `assessments.0003`, `lib/assessments.ts` `publicExamAction`, `components/exams/public-exam-card.tsx`; tests `test_exam_catalog.py`, `lib/public-exam-action.test.ts`.
+- Verified locally: 508 backend tests, ruff, OpenAPI validation, migrations check, frontend typecheck, lint, 151 unit tests and the production build.
+
 ## How to continue
 
 1. Read this file, then `docs/architecture.md` and `docs/decisions.md`.

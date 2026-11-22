@@ -148,6 +148,28 @@ class QuestionVersion(models.Model):
         ]
 
 
+# Exams a learner can take without enrolling in a course (exam-only enrollment).
+OFFERED_ON_ITS_OWN = Q(course__isnull=True) | Q(sold_separately=True)
+
+
+class ExamCategory(TimeStampedModel):
+    """Groups exams in the public Exams section (for example Loksewa, entrance
+    preparation or engineering licence). Managed by exam managers."""
+
+    name = models.CharField(max_length=120)
+    slug = models.SlugField(max_length=140, unique=True)
+    description = models.CharField(max_length=500, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["position", "name"]
+        verbose_name_plural = "exam categories"
+
+    def __str__(self):
+        return self.name
+
+
 class Exam(TimeStampedModel):
     class Kind(models.TextChoices):
         PRACTICE = "practice", "Practice test"
@@ -171,6 +193,8 @@ class Exam(TimeStampedModel):
     course = models.ForeignKey(Course, null=True, blank=True, on_delete=models.PROTECT, related_name="exams")
     kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.PRACTICE)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
+    category = models.ForeignKey(ExamCategory, null=True, blank=True, on_delete=models.SET_NULL, related_name="exams")
+    summary = models.CharField(max_length=300, blank=True)  # plain text for the exam card
 
     duration_minutes = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(600)])
     opens_at = models.DateTimeField(null=True, blank=True)
@@ -190,8 +214,11 @@ class Exam(TimeStampedModel):
     show_answers = models.BooleanField(default=True, help_text="Show correct answers in the review once released.")
     show_explanations = models.BooleanField(default=True)
     ranking_enabled = models.BooleanField(default=False)
-    # Only standalone exams (no course) can carry a price; a course exam is
-    # included with the course. A paid exam needs an ExamAccess grant.
+    # A course exam is included with the course. With `sold_separately` it is
+    # also offered on its own (exam-only enrollment) at `price`. A standalone
+    # exam is always on its own. A paid exam needs an ExamAccess grant, except
+    # for learners enrolled in its course.
+    sold_separately = models.BooleanField(default=False)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=ZERO)
 
     published_at = models.DateTimeField(null=True, blank=True)
@@ -217,7 +244,8 @@ class Exam(TimeStampedModel):
             ),
             models.CheckConstraint(condition=Q(price__gte=0), name="assessments_exam_price_non_negative"),
             models.CheckConstraint(
-                condition=Q(price=0) | Q(course__isnull=True), name="assessments_exam_paid_only_standalone"
+                condition=Q(price=0) | Q(course__isnull=True) | Q(sold_separately=True),
+                name="assessments_exam_paid_only_on_its_own",
             ),
         ]
 
@@ -227,6 +255,11 @@ class Exam(TimeStampedModel):
     @property
     def is_free(self):
         return self.price <= 0
+
+    @property
+    def offered_on_its_own(self) -> bool:
+        """Can be taken without enrolling in a course (exam-only enrollment)."""
+        return self.course_id is None or self.sold_separately
 
 
 class ExamAccess(TimeStampedModel):

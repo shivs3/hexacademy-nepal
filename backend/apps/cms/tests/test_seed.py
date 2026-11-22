@@ -30,7 +30,7 @@ def test_seed_cms_is_idempotent_and_preserves_edits():
     assert SiteSettings.load().tagline == "Edited by admin"
     assert Page.objects.get(slug="about").title == "Edited"
     assert Page.objects.count() == 5
-    assert Menu.objects.get(location="header").items.count() == 4
+    assert Menu.objects.get(location="header").items.count() == 5
     assert BlogPost.objects.filter(status="published").count() == 3
 
 
@@ -72,3 +72,16 @@ def test_edited_demo_content_is_never_replaced():
     page.refresh_from_db()
     assert page.sections[0]["data"]["heading"] == "Our own heading"
     assert [s["type"] for s in page.published_version.sections] == ["hero", "features", "faq", "cta"]
+
+
+def test_untouched_menu_from_the_last_seed_gains_exams():
+    call_command("seed_cms")
+    pages = {p.slug: p for p in Page.objects.all()}
+    items = [
+        {"label": label, "url": target} if target.startswith("/") else {"label": label, "page": pages[target]}
+        for label, target in PREVIOUS_MENUS["header"][-1]
+    ]
+    services.replace_menu("header", title="Main navigation", items=items, actor=None)
+    call_command("seed_cms")
+    labels = list(Menu.objects.get(location="header").items.order_by("position").values_list("label", flat=True))
+    assert labels == ["Courses", "Exams", "Blog", "About", "Contact"]

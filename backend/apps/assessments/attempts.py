@@ -75,16 +75,18 @@ def eligibility(
         return False, "closed"
     if exam.opens_at and now < exam.opens_at:
         return False, "not_open"
-    if exam.course_id:
-        if enrolled is None:
-            enrolled = active_enrollment(user, exam.course) is not None
-        if not enrolled:
+    # Learners enrolled in the exam's course take it as part of the course.
+    # Anyone else needs the exam on offer by itself, and access if it is paid.
+    if exam.course_id and enrolled is None:
+        enrolled = active_enrollment(user, exam.course) is not None
+    if not (exam.course_id and enrolled):
+        if not exam.offered_on_its_own:
             return False, "not_enrolled"
-    elif not exam.is_free:
-        if has_access is None:
-            has_access = has_exam_access(user, exam)
-        if not has_access:
-            return False, "not_purchased"
+        if not exam.is_free:
+            if has_access is None:
+                has_access = has_exam_access(user, exam)
+            if not has_access:
+                return False, "not_purchased"
     if exam.kind == Exam.Kind.FORMAL and verification_required() and not user.email_verified:
         return False, "email_unverified"
     if exam.max_attempts is not None and (attempts_used(user, exam) if used is None else used) >= exam.max_attempts:

@@ -32,6 +32,7 @@ from .admin_serializers import (
     AdminExamListSerializer,
     AdminExamSerializer,
     ExamAnalyticsSerializer,
+    ExamCategorySerializer,
     ExamImportSerializer,
     ExamQuestionListInputSerializer,
     ExamQuestionSerializer,
@@ -44,7 +45,7 @@ from .admin_serializers import (
     SubjectSerializer,
     TopicSerializer,
 )
-from .models import Exam, ExamAttempt, Question, Subject, Topic
+from .models import Exam, ExamAttempt, ExamCategory, Question, Subject, Topic
 
 StaffPanel = HasPerm("accounts.access_admin_panel")
 
@@ -230,8 +231,53 @@ class QuestionViewSet(viewsets.ModelViewSet):
 # --- Exams ---------------------------------------------------------------------------
 
 
+class ExamCategoryViewSet(viewsets.ModelViewSet):
+    """Categories for the public Exams section. Readable by everyone who can
+    open exams; changed by exam managers. Deleting one leaves its exams
+    uncategorised."""
+
+    serializer_class = ExamCategorySerializer
+    permission_classes = [StaffPanel, OpensExams]
+    pagination_class = None
+    filter_backends: list = []
+    http_method_names = ["get", "post", "patch", "delete"]
+
+    def get_queryset(self):
+        return ExamCategory.objects.annotate(exam_count=Count("exams"))
+
+    def check_write(self):
+        _require(policies.can_manage_exams(self.request.user), "Only exam managers can change exam categories.")
+
+    def perform_create(self, serializer):
+        self.check_write()
+        try:
+            category = serializer.save()
+        except IntegrityError as exc:
+            raise ConflictError("That address is already used by another category.", code="slug_taken") from exc
+        audit.record(
+            "assessments.exam_category_created", actor=self.request.user, target=category, request=self.request
+        )
+
+    def perform_update(self, serializer):
+        self.check_write()
+        try:
+            category = serializer.save()
+        except IntegrityError as exc:
+            raise ConflictError("That address is already used by another category.", code="slug_taken") from exc
+        audit.record(
+            "assessments.exam_category_updated", actor=self.request.user, target=category, request=self.request
+        )
+
+    def perform_destroy(self, instance):
+        self.check_write()
+        audit.record(
+            "assessments.exam_category_deleted", actor=self.request.user, target=instance, request=self.request
+        )
+        instance.delete()
+
+
 def annotated_exams(qs):
-    return qs.select_related("course").annotate(
+    return qs.select_related("course", "category").annotate(
         question_total=Count("exam_questions", distinct=True), attempt_total=Count("attempts", distinct=True)
     )
 

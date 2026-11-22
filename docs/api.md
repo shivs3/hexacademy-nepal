@@ -232,6 +232,17 @@ No payment gateway is active. Checkout for a paid course or paid standalone exam
 
 Courses are added and removed through the existing `/admin/learning/enrollments/` endpoints, and batches through `/admin/live-classes/batches/{id}/members/`.
 
+## Exams section (2026-11-22)
+
+Public, no sign-in. Never returns questions, options or answers.
+
+- `GET /api/v1/exam-catalog/` (paginated). Filters `search`, `category` (slug), `kind` practice/formal, `offer` free/paid/course, `ordering` newest/title/price_low/price_high. Rows: `slug, title, summary, kind, kind_label, category{name,slug}, course{title,slug}, offer, price, is_free, duration_minutes, question_total, total_marks, opens_at, closes_at, max_attempts, negative_marking`. `offer` is `course` when the exam is only taken with its course.
+- `GET /api/v1/exam-catalog/{slug}/` adds `instructions, pass_marks, allow_revisit, result_release_label, updated_at`. 404 for drafts, closed exams, exams whose course isn't published, or whose category is hidden.
+- `GET /api/v1/exam-catalog/categories/`: active categories with at least one listed exam, with `exam_count`.
+- `GET /api/v1/seo/exam-sitemap/`: `[{slug, updated_at}]`.
+- Staff: `/api/v1/admin/assessments/exam-categories/` CRUD (read for anyone who opens exams; writes need `assessments.manage_exams`; audited). Exams gain `category`, `summary`, `sold_separately`; changing `price` or `sold_separately` needs `manage_exams` (400 otherwise).
+- Learner `GET /api/v1/exams/` now also lists course exams offered on their own. A request (`POST /access-requests/`) for such an exam answers 409 `already_has_access` when the learner is enrolled in its course.
+
 ## Live classes (M6)
 
 ### Learner

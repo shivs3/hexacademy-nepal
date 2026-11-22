@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from apps.assessments.models import Exam, ExamAccess
+from apps.assessments.models import OFFERED_ON_ITS_OWN, Exam, ExamAccess
 from apps.catalog.models import Course
 from apps.learning.models import Enrollment
 from apps.live_classes.models import BatchMembership
@@ -170,7 +170,7 @@ class UserAccessSerializer(serializers.Serializer):
 
 class GrantExamSerializer(serializers.Serializer):
     exam = serializers.PrimaryKeyRelatedField(
-        queryset=Exam.objects.filter(status=Exam.Status.PUBLISHED, course__isnull=True)
+        queryset=Exam.objects.filter(OFFERED_ON_ITS_OWN, status=Exam.Status.PUBLISHED)
     )
 
 

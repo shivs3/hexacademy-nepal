@@ -133,6 +133,15 @@ export default async function ExamDetailPage({ params }: Props) {
                 <Button asChild>
                   <Link href={examCheckoutHref(exam.slug)}>Request access</Link>
                 </Button>
+                {exam.course && (
+                  <p className="text-sm text-muted">
+                    It is also included with{" "}
+                    <Link href={`/courses/${exam.course.slug}`} className="text-teal-700 hover:underline">
+                      {exam.course.title}
+                    </Link>
+                    .
+                  </p>
+                )}
               </>
             ) : exam.availability === "not_enrolled" && exam.course ? (
               <>
