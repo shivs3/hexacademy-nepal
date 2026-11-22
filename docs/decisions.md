@@ -302,3 +302,13 @@ Short records of choices that are expensive to reverse. Newest last.
 **Decision:** Exams get an offer price and end date like courses (`current_price()`), strictly between 0 and the actual price. Staff can grant any published exam, course-only ones included, and a new Assign access page gives many people many courses and exams in one transaction through the existing grant services.
 **Why:** Admins wanted to run discounts on exams and to add courses and exams to people directly (for example a class paid offline) without one form per person and item. Keeping the offer above 0 means "free" never depends on time. `attempts.eligibility` now separates "free" from "granted", so a grant is the one rule that opens a course exam without the course.
 **Consequences:** A course exam assigned to someone shows up in their exam list. Revoking the grant closes it again. The people lookup on the assign page shows only name and email of active accounts to staff who can already grant access by email.
+
+## ADR-059: Exam category sections (one level deep)
+
+**Context.** The Exams section needs an "NRB" area split into Paper I, II and III, each holding its own exams, all managed from the admin.
+
+**Decision.** `ExamCategory` gains an optional `parent` (self foreign key, `PROTECT`). A category with a parent is a *section*. Sections go one level deep only: a section can't have sections, a category that has sections can't become a section, and a category can't be its own parent. Deleting a category that still has sections returns 409. Exams keep a single `category` foreign key and are placed in a section by choosing it (shown as "NRB › Paper I").
+
+Publicly, `?category=nrb` lists the exams in NRB and all its sections; `?category=nrb-paper-1` lists only Paper I. Hiding a category also hides its sections' exams. `/exam-catalog/categories/` returns a tree: active top-level categories with their non-empty `children`, counts including sections.
+
+**Why not arbitrary depth / a tag model.** One level covers the paper/section use case, keeps queries to a single join (`category__parent`), and keeps the public page a simple two-step choice. Deeper nesting can be added later if a real need appears.

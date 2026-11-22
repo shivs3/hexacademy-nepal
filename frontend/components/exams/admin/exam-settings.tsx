@@ -14,7 +14,7 @@ import { useApiResource } from "@/hooks/use-api-resource";
 import { useSaveShortcut, useUnsavedWarning } from "@/hooks/use-unsaved-warning";
 import { api } from "@/lib/api/client";
 import { errorMessage, isApiError } from "@/lib/api/errors";
-import { EXAM_KIND_LABEL, RELEASE_LABEL } from "@/lib/assessments";
+import { categoryTree, EXAM_KIND_LABEL, RELEASE_LABEL } from "@/lib/assessments";
 import { toLocalInput } from "@/lib/utils";
 import type { AdminExam, AdminExamCategory, CourseOption, ExamKind, ResultRelease } from "@/types/assessments";
 
@@ -202,12 +202,12 @@ export function ExamSettings({ exam, manager, onSaved }: { exam: AdminExam; mana
             <Field label="Address" htmlFor="exam-slug" required error={errors.slug} hint={`Public page: /exams/${draft.slug || "…"}`}>
               <Input id="exam-slug" value={draft.slug} disabled={!canEdit} onChange={(e) => update({ slug: e.target.value })} />
             </Field>
-            <Field label="Category" htmlFor="exam-category" error={errors.category} hint={manager ? "Groups the exam on the public Exams page. Manage the list under Exam categories." : "Groups the exam on the public Exams page."}>
+            <Field label="Category" htmlFor="exam-category" error={errors.category} hint={manager ? "Groups the exam on the public Exams page. Pick a section, such as NRB › Paper I, to list it there. Manage the list under Exam categories." : "Groups the exam on the public Exams page."}>
               <Select id="exam-category" value={draft.category ?? ""} disabled={!canEdit} onChange={(e) => update({ category: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">No category</option>
-                {categories.data?.map((c) => (
+                {categoryTree(categories.data ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {c.depth ? `${c.parent_name} › ${c.name}` : c.name}
                     {c.is_active ? "" : " (hidden)"}
                   </option>
                 ))}

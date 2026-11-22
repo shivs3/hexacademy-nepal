@@ -168,3 +168,20 @@ export function publicExamAction(exam: PublicExam, signedIn: boolean, learner: L
       return { label: "Open in your dashboard", href: page, note: AVAILABILITY_TEXT[learner.availability] + "." };
   }
 }
+
+/**
+ * Orders exam categories as a tree: each top-level category followed by its
+ * sections (NRB, then NRB › Paper I, II, III). Sections whose parent is missing
+ * from the list are kept at the end so nothing disappears.
+ */
+export function categoryTree<T extends { id: number; parent: number | null }>(categories: T[]): (T & { depth: 0 | 1 })[] {
+  const ids = new Set(categories.map((c) => c.id));
+  const out: (T & { depth: 0 | 1 })[] = [];
+  for (const c of categories) {
+    if (c.parent !== null) continue;
+    out.push({ ...c, depth: 0 });
+    for (const s of categories) if (s.parent === c.id) out.push({ ...s, depth: 1 });
+  }
+  for (const c of categories) if (c.parent !== null && !ids.has(c.parent)) out.push({ ...c, depth: 0 });
+  return out;
+}

@@ -60,12 +60,25 @@ export default async function ExamsPage({ searchParams }: Props) {
     serverGet<PublicExamCategory[]>("/exam-catalog/categories/").catch(() => []),
   ]);
   const filtered = Boolean(filters.search || filters.category || filters.kind || filters.offer);
-  const active = categories.find((c) => c.slug === filters.category);
+  // The chosen category may be a top-level one (NRB) or a section inside it (NRB › Paper I).
+  const top = categories.find((c) => c.slug === filters.category || c.children.some((s) => s.slug === filters.category));
+  const section = top?.children.find((s) => s.slug === filters.category);
+  const active = section ?? top;
+  const heading = section && top ? `${top.name} ${section.name}` : active?.name;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
       <header className="max-w-2xl">
-        <h1 className="text-4xl font-bold">{active ? `${active.name} exams` : "Exams"}</h1>
+        {section && top && (
+          <nav aria-label="Breadcrumb" className="mb-2 text-sm text-muted">
+            <Link href={href(filters, { category: top.slug, page: undefined })} className="hover:text-teal-700 hover:underline">
+              {top.name}
+            </Link>
+            {" / "}
+            <span aria-current="page">{section.name}</span>
+          </nav>
+        )}
+        <h1 className="text-4xl font-bold">{heading ? `${heading} exams` : "Exams"}</h1>
         <p className="mt-3 text-lg text-muted">
           {active?.description || "Practice tests and formal exams. Take them on their own, without enrolling in a course."}
         </p>
@@ -74,7 +87,7 @@ export default async function ExamsPage({ searchParams }: Props) {
       {categories.length > 0 && (
         <nav aria-label="Exam categories" className="mt-8 flex flex-wrap gap-2">
           {[{ name: "All", slug: "" }, ...categories].map((c) => {
-            const current = (filters.category ?? "") === c.slug;
+            const current = c.slug ? top?.slug === c.slug : !filters.category;
             return (
               <Link
                 key={c.slug || "all"}
@@ -90,6 +103,53 @@ export default async function ExamsPage({ searchParams }: Props) {
             );
           })}
         </nav>
+      )}
+
+      {top && top.children.length > 0 && (
+        <>
+          {!section && (
+            <section aria-labelledby="exam-sections" className="mt-8">
+              <h2 id="exam-sections" className="sr-only">
+                {top.name} sections
+              </h2>
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {top.children.map((s) => (
+                  <li key={s.slug}>
+                    <Link
+                      href={href(filters, { category: s.slug, page: undefined })}
+                      className="flex h-full flex-col rounded-[var(--radius-card)] border border-line bg-white p-5 transition-colors hover:border-teal focus-visible:outline-2 focus-visible:outline-teal"
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wide text-teal-700">{top.name}</span>
+                      <span className="mt-1 text-lg font-semibold text-navy">{s.name}</span>
+                      {s.description && <span className="mt-2 line-clamp-3 text-sm text-muted">{s.description}</span>}
+                      <span className="mt-auto pt-3 text-sm font-medium text-teal-700">
+                        {s.exam_count} {s.exam_count === 1 ? "exam" : "exams"} →
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <nav aria-label={`${top.name} sections`} className="mt-6 flex flex-wrap gap-2">
+            {[{ name: `All ${top.name}`, slug: top.slug }, ...top.children].map((s) => {
+              const current = (filters.category ?? "") === s.slug;
+              return (
+                <Link
+                  key={s.slug}
+                  href={href(filters, { category: s.slug, page: undefined })}
+                  aria-current={current ? "page" : undefined}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-sm transition-colors",
+                    current ? "border-teal bg-teal-50 font-medium text-teal-700" : "border-line bg-white text-body hover:border-teal hover:text-teal-700",
+                  )}
+                >
+                  {s.name}
+                </Link>
+              );
+            })}
+          </nav>
+        </>
       )}
 
       <form method="get" action="/exams" className="mt-6 grid gap-3 rounded-[var(--radius-card)] border border-line bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_repeat(3,1fr)_auto]">

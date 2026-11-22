@@ -243,7 +243,9 @@ class ExamCategoryViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete"]
 
     def get_queryset(self):
-        return ExamCategory.objects.annotate(exam_count=Count("exams"))
+        return ExamCategory.objects.select_related("parent").annotate(
+            exam_count=Count("exams", distinct=True), section_count=Count("children", distinct=True)
+        )
 
     def check_write(self):
         _require(policies.can_manage_exams(self.request.user), "Only exam managers can change exam categories.")
@@ -270,6 +272,8 @@ class ExamCategoryViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self.check_write()
+        if instance.children.exists():
+            raise ConflictError("This category has sections. Remove or move its sections first.", code="has_sections")
         audit.record(
             "assessments.exam_category_deleted", actor=self.request.user, target=instance, request=self.request
         )
@@ -277,7 +281,7 @@ class ExamCategoryViewSet(viewsets.ModelViewSet):
 
 
 def annotated_exams(qs):
-    return qs.select_related("course", "category").annotate(
+    return qs.select_related("course", "category__parent").annotate(
         question_total=Count("exam_questions", distinct=True), attempt_total=Count("attempts", distinct=True)
     )
 

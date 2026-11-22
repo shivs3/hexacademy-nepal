@@ -36,8 +36,11 @@ def public_exams(now=None):
         Exam.objects.filter(status=Exam.Status.PUBLISHED)
         .filter(Q(closes_at__isnull=True) | Q(closes_at__gt=now))
         .filter(Q(course__isnull=True) | Q(course__status=Course.Status.PUBLISHED))
-        .filter(Q(category__isnull=True) | Q(category__is_active=True))
-        .select_related("course", "category")
+        .filter(
+            Q(category__isnull=True)
+            | (Q(category__is_active=True) & (Q(category__parent__isnull=True) | Q(category__parent__is_active=True)))
+        )
+        .select_related("course", "category__parent")
     )
 
 
@@ -48,9 +51,17 @@ def offer_of(exam: Exam) -> str:
     return "free" if exam.is_free else "paid"
 
 
-class ExamCategoryRef(serializers.Serializer):
+class ExamCategoryParentRef(serializers.Serializer):
     name = serializers.CharField()
     slug = serializers.CharField()
+
+
+class ExamCategoryRef(serializers.Serializer):
+    """The exam's category; `parent` is set when it is a section (NRB › Paper I)."""
+
+    name = serializers.CharField()
+    slug = serializers.CharField()
+    parent = ExamCategoryParentRef(allow_null=True)
 
 
 class ExamCourseRef(serializers.Serializer):
@@ -104,7 +115,7 @@ class PublicExamDetailSerializer(PublicExamSerializer):
 @extend_schema(
     parameters=[
         OpenApiParameter("search", str),
-        OpenApiParameter("category", str, description="Category slug"),
+        OpenApiParameter("category", str, description="Category slug; a category also lists its sections' exams"),
         OpenApiParameter("kind", str, enum=Exam.Kind.values),
         OpenApiParameter("offer", str, enum=list(OFFERS)),
         OpenApiParameter("ordering", str, enum=list(ORDERINGS)),
@@ -126,7 +137,7 @@ class PublicExamListView(generics.ListAPIView):
                 | Q(course__title__icontains=search)
             )
         if category := params.get("category"):
-            qs = qs.filter(category__slug=category)
+            qs = qs.filter(Q(category__slug=category) | Q(category__parent__slug=category))
         if (kind := params.get("kind")) in Exam.Kind.values:
             qs = qs.filter(kind=kind)
         offer = params.get("offer")
@@ -154,32 +165,57 @@ class PublicExamDetailView(APIView):
         return Response(PublicExamDetailSerializer(exam).data)
 
 
+def _category_fields(children=None):
+    fields = {
+        "name": serializers.CharField(),
+        "slug": serializers.CharField(),
+        "description": serializers.CharField(),
+        "exam_count": serializers.IntegerField(),
+    }
+    if children:
+        fields["children"] = children
+    return fields
+
+
 class PublicExamCategoriesView(APIView):
-    """Active categories that have at least one listed exam, with how many."""
+    """Active top-level categories that have listed exams, each with its active
+    sections (`children`). A category's count includes its sections' exams;
+    empty sections and categories are left out."""
 
     permission_classes = [AllowAny]
 
     @extend_schema(
         responses=inline_serializer(
             "PublicExamCategory",
-            {
-                "name": serializers.CharField(),
-                "slug": serializers.CharField(),
-                "description": serializers.CharField(),
-                "exam_count": serializers.IntegerField(),
-            },
+            _category_fields(inline_serializer("PublicExamSection", _category_fields(), many=True)),
             many=True,
         )
     )
     def get(self, request):
         listed = public_exams().values("pk")
-        rows = (
+        rows = list(
             ExamCategory.objects.filter(is_active=True)
+            .filter(Q(parent__isnull=True) | Q(parent__is_active=True))
             .annotate(exam_count=Count("exams", filter=Q(exams__in=listed)))
-            .filter(exam_count__gt=0)
-            .values("name", "slug", "description", "exam_count")
+            .values("id", "parent_id", "name", "slug", "description", "exam_count")
         )
-        return Response(list(rows))
+
+        def public(r):
+            return {k: r[k] for k in ("name", "slug", "description", "exam_count")}
+
+        sections: dict[int, list] = {}
+        for r in rows:
+            if r["parent_id"] and r["exam_count"]:
+                sections.setdefault(r["parent_id"], []).append(public(r))
+        tree = []
+        for r in rows:
+            if r["parent_id"]:
+                continue
+            children = sections.get(r["id"], [])
+            total = r["exam_count"] + sum(c["exam_count"] for c in children)
+            if total:
+                tree.append({**public(r), "exam_count": total, "children": children})
+        return Response(tree)
 
 
 class ExamSitemapView(APIView):

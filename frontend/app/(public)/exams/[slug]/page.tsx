@@ -60,6 +60,14 @@ export default async function PublicExamPage({ params }: Props) {
               <Link href="/exams" className="hover:text-white hover:underline">
                 Exams
               </Link>
+              {exam.category?.parent && (
+                <>
+                  {" / "}
+                  <Link href={`/exams?category=${encodeURIComponent(exam.category.parent.slug)}`} className="hover:text-white hover:underline">
+                    {exam.category.parent.name}
+                  </Link>
+                </>
+              )}
               {exam.category && (
                 <>
                   {" / "}

@@ -103,11 +103,33 @@ class SubjectSerializer(serializers.ModelSerializer):
 
 
 class ExamCategorySerializer(serializers.ModelSerializer):
+    """A category, or a section inside one (`parent` set). Sections go one level
+    deep only, so the public page stays a simple category › section choice."""
+
     exam_count = serializers.IntegerField(read_only=True, default=0)
+    section_count = serializers.IntegerField(read_only=True, default=0)
+    parent = serializers.PrimaryKeyRelatedField(queryset=ExamCategory.objects.all(), allow_null=True, required=False)
+    parent_name = serializers.CharField(source="parent.name", read_only=True, default="")
 
     class Meta:
         model = ExamCategory
-        fields = ["id", "name", "slug", "description", "position", "is_active", "exam_count"]
+        fields = [
+            "id", "name", "slug", "description", "position", "is_active", "exam_count",
+            "parent", "parent_name", "section_count",
+        ]  # fmt: skip
+
+    def validate_parent(self, parent):
+        if parent is None:
+            return None
+        if self.instance is not None and parent.pk == self.instance.pk:
+            raise serializers.ValidationError("A category can't be a section of itself.")
+        if parent.parent_id:
+            raise serializers.ValidationError("Choose a top-level category. Sections can't have sections of their own.")
+        if self.instance is not None and self.instance.children.exists():
+            raise serializers.ValidationError(
+                "This category has sections of its own, so it can't become a section. Move its sections first."
+            )
+        return parent
 
     def validate_name(self, value):
         return _plain_required(value)
@@ -277,7 +299,7 @@ class ExamQuestionListInputSerializer(serializers.Serializer):
 
 class AdminExamListSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source="course.title", read_only=True, default="")
-    category_name = serializers.CharField(source="category.name", read_only=True, default="")
+    category_name = serializers.CharField(source="category.path", read_only=True, default="")
     question_total = serializers.IntegerField(read_only=True, default=0)
     attempt_total = serializers.IntegerField(read_only=True, default=0)
 

@@ -155,8 +155,12 @@ OFFERED_ON_ITS_OWN = Q(course__isnull=True) | Q(sold_separately=True)
 
 class ExamCategory(TimeStampedModel):
     """Groups exams in the public Exams section (for example Loksewa, entrance
-    preparation or engineering licence). Managed by exam managers."""
+    preparation or engineering licence). Managed by exam managers.
 
+    A category may sit inside one other category as a section (for example
+    NRB › Paper I). Only one level deep: a section has no sections of its own."""
+
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="children")
     name = models.CharField(max_length=120)
     slug = models.SlugField(max_length=140, unique=True)
     description = models.CharField(max_length=500, blank=True)
@@ -168,7 +172,12 @@ class ExamCategory(TimeStampedModel):
         verbose_name_plural = "exam categories"
 
     def __str__(self):
-        return self.name
+        return self.path
+
+    @property
+    def path(self) -> str:
+        """'NRB › Paper I' for a section, the plain name otherwise."""
+        return f"{self.parent.name} › {self.name}" if self.parent_id else self.name
 
 
 class Exam(TimeStampedModel):

@@ -202,3 +202,7 @@ Meeting links and passcodes never leave the server except through the join endpo
 ## Backups
 
 See [deployment.md](deployment.md#backups). Use `pg_dump` custom format daily, keep copies off-host, and test restores.
+
+## Exam category sections (2026-11-22)
+
+`assessments_examcategory.parent_id` → `assessments_examcategory.id`, nullable, `ON DELETE PROTECT`, related name `children` (migration `assessments 0005_exam_category_sections`). One level deep, enforced in the admin serializer (the database allows deeper rows, but the API never creates them). `PROTECT` stops a category with sections being deleted.

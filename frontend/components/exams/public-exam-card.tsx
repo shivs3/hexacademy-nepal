@@ -17,7 +17,7 @@ export function PublicExamCard({ exam, headingLevel = "h3" }: { exam: PublicExam
   return (
     <article className="group relative flex h-full flex-col rounded-[var(--radius-card)] border border-line bg-white p-5 transition-shadow hover:shadow-md">
       <div className="flex flex-wrap items-center gap-2">
-        {exam.category && <span className="text-xs font-semibold uppercase tracking-wide text-teal-700">{exam.category.name}</span>}
+        {exam.category && <span className="text-xs font-semibold uppercase tracking-wide text-teal-700">{exam.category.parent ? `${exam.category.parent.name} › ${exam.category.name}` : exam.category.name}</span>}
         <Badge tone={exam.kind === "formal" ? "navy" : "mint"}>{EXAM_KIND_LABEL[exam.kind]}</Badge>
       </div>
       <H className="mt-2 text-lg font-semibold leading-snug">

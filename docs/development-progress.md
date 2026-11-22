@@ -535,3 +535,10 @@ Update this file at the end of every milestone. Only record what was actually ex
    - Run E2E against `npm run build && npm run start`, not `next dev`.
    - E2E specs create `e2e-` courses and learners in the dev database; delete them afterwards (Refund and Payment rows first, since they PROTECT orders).
 4. Keep the verification bar: tests and builds must actually run before anything is marked done.
+
+## Exam category sections — NRB › Paper I/II/III (2026-11-22)
+
+- Backend: `ExamCategory.parent` (migration 0005), one-level validation, 409 on deleting a category with sections, public filter/tree/parent-visibility, full-path `category_name`. Tests: `apps/assessments/tests/test_exam_sections.py` (6 tests); `test_exam_catalog.py` updated for the `children` key.
+- Frontend: `/exams` shows top-level category pills; choosing one with sections shows section cards and a section pill row; breadcrumb on section and exam pages; cards labelled "NRB › Paper I". Admin Exam categories manager shows a tree, "+ Section" per category and a "Section of" field; exam settings Category select lists "NRB › Paper I". Helper `categoryTree` in `lib/assessments.ts` (tested).
+- Checks: backend pytest all passing, OpenAPI validates, no pending migrations; frontend tsc, eslint, vitest (158) and build pass.
+- Production data: NRB (`nrb`) with Paper I/II/III (`nrb-paper-1..3`) created after deploy. Existing exams were not moved automatically; admins put exams in a paper via Exam → Settings → Category.

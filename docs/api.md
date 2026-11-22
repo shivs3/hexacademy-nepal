@@ -334,3 +334,11 @@ Permission: `manage_all_classes`, or `teach_assigned_classes` on a course where 
 | `/readyz/` | Readiness: the database answers `SELECT 1`; 503 otherwise |
 
 Later milestones add sections here as their endpoints land.
+
+## Exam category sections (2026-11-22)
+
+- Admin `/api/v1/admin/assessments/exam-categories/`: rows gain `parent` (id or null, writable), `parent_name` and `section_count`. Validation errors on `parent` (400) for nesting deeper than one level or self-parenting. `DELETE` of a category that has sections → 409 `has_sections`.
+- Admin exams: `category_name` is now the full path, e.g. `"NRB › Paper I"`.
+- Public `GET /api/v1/exam-catalog/?category=<slug>`: a top-level slug also matches exams in its sections.
+- Public exam `category` is `{name, slug, parent: {name, slug} | null}`.
+- Public `GET /api/v1/exam-catalog/categories/`: `[{name, slug, description, exam_count, children: [{name, slug, description, exam_count}]}]`. Only active categories/sections with listed exams; a category's `exam_count` includes its sections.

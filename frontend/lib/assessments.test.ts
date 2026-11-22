@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { attemptsLeftText, clockOffset, formatClock, formatDuration, formatMarks, optionLetter, remainingMs, sameSelection, toggleSelection } from "./assessments";
+import { attemptsLeftText, categoryTree, clockOffset, formatClock, formatDuration, formatMarks, optionLetter, remainingMs, sameSelection, toggleSelection } from "./assessments";
 
 describe("toggleSelection", () => {
   it("replaces the choice for single-answer questions", () => {
@@ -65,5 +65,18 @@ describe("formatting", () => {
     expect(attemptsLeftText(null, 4)).toBe("Unlimited attempts");
     expect(attemptsLeftText(3, 1)).toBe("2 of 3 attempts left");
     expect(attemptsLeftText(1, 2)).toBe("0 of 1 attempt left");
+  });
+});
+
+describe("categoryTree", () => {
+  it("puts each category's sections straight after it", () => {
+    const rows = [
+      { id: 1, parent: null, name: "Loksewa" },
+      { id: 3, parent: 2, name: "Paper I" },
+      { id: 2, parent: null, name: "NRB" },
+      { id: 4, parent: 2, name: "Paper II" },
+      { id: 5, parent: 99, name: "Orphan" },
+    ];
+    expect(categoryTree(rows).map((r) => `${r.depth}:${r.name}`)).toEqual(["0:Loksewa", "0:NRB", "1:Paper I", "1:Paper II", "0:Orphan"]);
   });
 });

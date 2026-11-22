@@ -22,7 +22,7 @@ export type PublicExam = {
   summary: string;
   kind: ExamKind;
   kind_label: string;
-  category: { name: string; slug: string } | null;
+  category: { name: string; slug: string; parent: { name: string; slug: string } | null } | null;
   course: { title: string; slug: string } | null;
   offer: ExamOffer;
   price: string;
@@ -47,7 +47,9 @@ export type PublicExamDetail = PublicExam & {
   updated_at: string;
 };
 
-export type PublicExamCategory = { name: string; slug: string; description: string; exam_count: number };
+export type PublicExamSection = { name: string; slug: string; description: string; exam_count: number };
+/** A top-level category with its sections (for example NRB › Paper I). Counts include the sections' exams. */
+export type PublicExamCategory = PublicExamSection & { children: PublicExamSection[] };
 
 export type AdminExamCategory = {
   id: number;
@@ -57,6 +59,10 @@ export type AdminExamCategory = {
   position: number;
   is_active: boolean;
   exam_count: number;
+  /** Set when this is a section inside another category. */
+  parent: number | null;
+  parent_name: string;
+  section_count: number;
 };
 
 // --- Learner -----------------------------------------------------------------

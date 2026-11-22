@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PublicExam } from "@/types/assessments";
 
-import { ExamPrice } from "./public-exam-card";
+import { ExamPrice, PublicExamCard } from "./public-exam-card";
 
 const exam: PublicExam = {
   slug: "loksewa-mock", title: "Loksewa mock", summary: "", kind: "formal", kind_label: "Formal assessment", category: null,
@@ -25,5 +25,13 @@ describe("ExamPrice", () => {
     expect(screen.getByText(/500/)).not.toHaveClass("line-through");
     rerender(<ExamPrice exam={{ ...exam, offer: "course" }} />);
     expect(screen.getByText("Included with the course")).toBeInTheDocument();
+  });
+});
+
+describe("PublicExamCard", () => {
+  it("labels an exam in a section with its category and section", () => {
+    const category = { name: "Paper I", slug: "nrb-paper-1", parent: { name: "NRB", slug: "nrb" } };
+    render(<PublicExamCard exam={{ ...exam, category }} />);
+    expect(screen.getByText("NRB › Paper I")).toBeInTheDocument();
   });
 });

@@ -76,7 +76,7 @@ def test_catalog_filters(make_exam, make_course, loksewa):
     assert slugs(client.get(CATALOG, {"kind": "formal"})) == {free.slug}
     assert slugs(client.get(CATALOG, {"search": "licence"})) == {paid.slug}
     cats = client.get(f"{CATALOG}categories/").json()
-    assert cats == [{"name": "Loksewa", "slug": "loksewa", "description": "", "exam_count": 1}]
+    assert cats == [{"name": "Loksewa", "slug": "loksewa", "description": "", "exam_count": 1, "children": []}]
     loksewa.is_active = False
     loksewa.save()
     assert client.get(f"{CATALOG}categories/").json() == []
